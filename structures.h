@@ -1,24 +1,24 @@
-typedef struct SP SP;
-typedef struct SD SD;
+typedef struct PS PS;
+typedef struct DS DS;
 
-struct SD;
+struct DS;
 
-struct SP			// Serveur primaire
+struct PS			// Primary server 
 {
-	int nom;		// Identifie le serveur
-	int taux;		// Taux d'utilisation (pourcentage)
-	int taille;		// Nombre de fils à regarder pour EDF
-	SD *fils[10];	// Pointeurs vers les fils dans l'arbre
-	SD *pere;		// Utile pour remonter les deadlines aux SD plus haut dans l'arbre (de nom 0 si racine)
+	int name;		// name of server
+	int rate;		// rate of utilisation (percentage)
+	int size;		// number of sons to look for EDF 
+	DS *son[10];	        // Pointers to the sons of tree
+	DS *father;		//useful to recover the deadlines to hight level DS of the tree
 };
 
-struct SD			// Serveur dual
+struct DS			// dual server 
 {
-	int nom;			// Identifie le serveur
-	int taux;			// Taux d'utilisation
-	int nombre;			// Nombre de taches dans le serveur
-	int periodes[30];	// Periode des taches du serveur
-	int deadlines[30];	// Prochaine deadline associee a chaque periode
-	SP *fils;			// L'unique fils dans l'arbre (de nom 0 si tache)
-	SP *pere;			// Utile pour remonter les deadlines aux SD plus haut dans l'arbre
+	int name;		// Name of server
+	int rate;		// rate of utilisation
+	int number;		// number of task in the server
+	int periods[30];	// Tasks periods of server
+	int deadlines[30];	// Next deadline associate with each periods
+	PS *son;		// The only son in the tree ( the name 0 if is a task)
+	PS *father;		// useful to recover the deadlines to hight level DS of the tree
 };
