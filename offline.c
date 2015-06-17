@@ -69,6 +69,8 @@ int main(int argc, char* argv[]){
 		return 1;
 	}
 
+	/* On fait pack puis reduce autant de fois que nécesaire et on affiche tout */
+
 	dPos = number;
 	pPos = 0;
 
@@ -148,6 +150,9 @@ int dual(int first, int last, int dPos){
 		serveursDuaux[dPos+i].nom = dPos+i+1;
 		serveursDuaux[dPos+i].taux = 100-serveursPrimaires[first+i].taux;
 		nombre = 0;
+
+		/* On parcourt les fils du primaire correspondant et on concatène leurs périodes et deadlines */
+
 		for(j = 0 ; j < serveursPrimaires[first+i].taille ; j++){
 			for(k = 0 ; k < serveursPrimaires[first+i].fils[j]->nombre ; k++){
 				serveursDuaux[dPos+i].periodes[nombre+k] = serveursPrimaires[first+i].fils[j]->periodes[k];
