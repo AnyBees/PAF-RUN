@@ -5,30 +5,33 @@
 #include <time.h>
 #include <sys/time.h>
 #include "structures.h"
+#include <stdbool.h>
 
 typedef struct {
   pthread_cond_t  Cond_Var;
   pthread_mutex_t Lock;
   pthread_t       Thread_Id;
-} Shared_T;
+} Shared_Task;
 
-typedef struct {
+Shared_Task Shared_T;
+
+/*typedef struct {
 	// sigjmp_buf context;
-	bool active; /* true when job is released till its done executing */
-			/* time in microsec */
-	unsigned long WCET; //Worst Case Execution Time
+	_Bool active; // true when job is released till its done executing
+	// time in microsec
+	unsigned long WCET; // Worst Case Execution Time
 	unsigned long period;
 	unsigned long deadline;
 	unsigned long phase;
 	unsigned long long abs_deadline;
 	unsigned long long next_release;
 	void* stack;
-} task;
+} task;*/
 
-SD Tasks[30];
+struct TSK Tasks;
 
-timespec ts;
-timespec nextperiod;
+struct timespec ts;
+struct timespec nextperiod;
 //timeval tp;
 
 int main (int argc, char *argv[]){
@@ -38,15 +41,16 @@ int main (int argc, char *argv[]){
   int totalrate;
   int nbr;
   int firstdeadline = 32767;
-  int firstexec = NULL;
-  int nextexec = NULL;
+  int firstexec = (int) NULL;
+  int nextexec = (int) NULL;
   int nextdeadline = 32767;
   int timeexec = 0;
+  int TaskNbr;
 
-  // int checktime(int )
+  void Un_Thread(void);
 
-  if (argc != argv[1]){
-    printf("Usage : %s nombre-de-taches\n");
+  if (argc != (int) argv[1]){
+    printf("Usage : %s nombre-de-taches\n", argv[0]);
     exit(1);
   }
 
@@ -54,25 +58,23 @@ int main (int argc, char *argv[]){
 
   /* Creation et initialisation du tableau contenant les periodes et deadlines des taches */
 
-  // int TaskTab[2][TaskNbr];
+  printf("Quels sont le taux d'utilisation et la periode pour chaque tache ?\n");
 
-  printf("Quels sont le taux d'utilisation et la periode pour chaque tache ?\n")
-
-  for (i = 0, i < TaskNbr, i++){
+  for (i = 0; i < TaskNbr; i++){
     nbr = scanf("%d %d", &period, &rate);
     if (nbr != 2){
-      printf();
+      printf("L'usage est periode-tache taux-activite-tache\n");
     }
 
     Tasks.periods[i] = period;
     Tasks.rate[i] = rate;
   }
 
-  for i = 0, i < TaskNbr, i++){
-    totalrate += TaskTab[1][i]*0.01;
+  for (i = 0; i < TaskNbr; i++){
+    totalrate += Tasks.rate[i];
   }
 
-  if (rate > 1){
+  if (totalrate > 100){
     printf("Le taux d'utilisation ne peut etre superieur a 100 pourcents\n");
   }
 
@@ -85,85 +87,60 @@ int main (int argc, char *argv[]){
 
   /* creation des threads  */
 
-  for (i = 0 ; i < TaskNbr ; i++){
+  for (i = 0; i < TaskNbr; i++){
     pthread_create(&Threads[i], NULL, (void *) Un_Thread, NULL);
-    printf("vient d'etre cree : (0x)%x\n", (int)Threads[i]);
+    printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
   }
 
-  /* attendre la fin des threads precedemment crees */
-	/*for (i = 0 ; i < TaskNbr ; i++){
-		pthread_join (Threads[i], NULL);
-		printf("fin de tid %x\n", (int)Threads[i]);
-	}*/
-
-  // return 0;
-
-  while (true){
+  while (1){
 
     for (i = 0; i < TaskNbr; i++){
+      /* Check which task has the first deadline
+      *  Only if the task has not been completed for this period*/
       if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
-        firstdeadline = Tasks.deadlines[i];
-        firstexec = i;
+        firstdeadline = Tasks.deadlines[i]; // Get the first deadline
+        firstexec = i; // Get the first task
       }
     }
 
     i = 0;
 
     while(i != firstdeadline){
+      /* Check which task has the next deadline
+      *  Only if the task has not been completed for this period*/
       if (Tasks.deadlines[i] < nextdeadline && !Tasks.complete[i]){
-        nextdeadline = Tasks.deadlines[i];
-        nextexec = i;
+        nextdeadline = Tasks.deadlines[i]; // Get the next deadline
+        nextexec = i; // Get the next task
       }
     }
 
-    if (timeexec < Tasks.periods[nextexec]){
-      clock_gettime(CLOCK_REALTIME, &ts);
+    clock_gettime(CLOCK_REALTIME, &ts); // Get the time
 
-      if ((nextperiod.tv_sec - ts.tv_sec) < Tasks.periods[firstexec]*Tasks.rate[firstexec]*0.01){
-        ts.tv_sec += (nextperiod.tv_sec - ts.tv_sec);
-        Tasks.completion[firstexec] = ((int)(nextperiod.tv_sec - ts.tv_sec)*100 / Tasks.periods[firstexec]*Tasks.rate[firstexec]);
-      } else {
-        ts.tv_sec += Tasks.periods[firstexec]*Tasks.rate[firstexec]*0.01;
-        Tasks.completion[firstexec] = 100;
-        Tasks.complete[firstexec] = 1;
-      }
-
-      pthread_mutex_lock(&Shared_T.Lock);
-      pthread_cond_timedwait(&Shared_T.Cond_Var, &Shared_T.Lock, &ts);
-      pthread_mutex_unlock(&Shared_T.Lock);
-
-      Tasks.deadlines[firstexec] += Tasks.periods[firstexec];
-      timexec += Tasks.periods[firstexec]*Tasks.rate[firstexec]*0.01;
-
-      /*if (Tasks.periods[nextexec] < Tasks.periods[firstexec]){
-        nextperiod.tv_sec = ts.tv_sec + (Tasks.periods[nextexec] - timeexec);
-      }*/
+    /* If the next task needs to be executed sooner than at the end
+    *  of the first task execution time*/
+    if ((nextperiod.tv_sec - ts.tv_sec) < Tasks.periods[firstexec]*Tasks.rate[firstexec]*0.01){
+      ts.tv_sec += (nextperiod.tv_sec - ts.tv_sec); // Add part of the execution time
+      // Add the completion rate for that very execution time
+      Tasks.completion[firstexec] = ((int) (nextperiod.tv_sec - ts.tv_sec)*100 / Tasks.periods[firstexec]*Tasks.rate[firstexec]);
+    } else {
+      // Otherwise, execute the task for its whole execution time
+      ts.tv_sec += Tasks.periods[firstexec]*Tasks.rate[firstexec]*0.01;
+      Tasks.deadlines[firstexec] += Tasks.periods[firstexec]; // Period time added to the deadline
+      Tasks.completion[firstexec] = 100; // Completion is at 100%
+      Tasks.complete[firstexec] = 1; // The task doesn't need to be executed again until its next period
     }
 
-    // if (timeexec)
+    pthread_mutex_lock(&Shared_T.Lock); // Lock
+    pthread_cond_timedwait(&Shared_T.Cond_Var, &Shared_T.Lock, &ts); // Wait for the execution of the thread
+    pthread_mutex_unlock(&Shared_T.Lock); // Unlock
 
-    // Acquittes++;
-    printf("fin du thread (0x)%x\n", (int)Zone_Part.Thread_Id);
-    /* Pour eviter que deux threads se terminent
-     * l'un  a la suite de l'autre
-     * sans que main ait pu acquitter le premier
-     */
-    // pthread_mutex_unlock(&Verrou_Acq);
+    printf("fin du thread (0x)%x\n", (int) Shared_T.Thread_Id);
+
   }
-  pthread_mutex_unlock(&Shared_T.Lock);
-  /* printf("main (Tid (0x)%x) : FIN, et nombre de threads acquittes : %d, nombre de threads termines : %d\n",
-         (int)Tid_main, Acquittes,Zone_Part.Threads_Finis); */
+
   return 0;
 
 }
-
-/*int checktime(timespec nextperiod, pthread_cond_t Lock){
-  timespec tc;
-  while(&Lock){
-    clock_gettime(CLOCK_REALTIME, &tc);
-    if(tc.tv_sec)
-  }
-}*/
 
 /*-----------------------------------------------------------------
                             Un_Thread
@@ -174,9 +151,9 @@ void Un_Thread(void){
   void Fonc1(void);
 
   mon_tid = pthread_self();
-  printf("Thread (0x)%x : DEBUT\n", (int)mon_tid);
+  printf("Thread (0x)%x : DEBUT\n", (int) mon_tid);
   Fonc1();
-  printf("Thread (0x)%x : FIN\n", (int)mon_tid);
+  printf("Thread (0x)%x : FIN\n", (int) mon_tid);
   pthread_exit(NULL);
 }
 
