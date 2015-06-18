@@ -61,6 +61,8 @@ int main(int argc, char* argv[]){
 		totalRate += rate;
 		dualServer[i].periods[0] = period;
 		dualServer[i].deadlines[0] = period;
+        dualServer[i].complete[0] = false;
+        dualServer[i].completion[0] = 0;
 		dualServer[i].sons = &leaf;
 	}
 
@@ -152,6 +154,8 @@ int dual(int first, int last, int dPos){
 			for(k = 0 ; k < primaryServer[first+i].sons[j]->number ; k++){
 				dualServer[dPos+i].periods[number+k] = primaryServer[first+i].sons[j]->periods[k];
 				dualServer[dPos+i].deadlines[number+k] = primaryServer[first+i].sons[j]->deadlines[k];
+                dualServer[dPos+i].complete[number+k] = false;
+                dualServer[dPos+i].completion[number+k] = 0;
 			}
 			number += k;
 		}
