@@ -25,12 +25,12 @@ int main(int argc, char* argv[]){
 
 	PS leaf;
 	leaf.name = 0;
-	leaf.sons[0] = 0;
+	leaf.son[0] = 0;
 	leaf.father = 0;
 
 	DS root;
 	root.name = 0;
-	root.sons = 0;
+	root.son = 0;
 	root.father = 0;
 
 	/* Input des tasks */
@@ -61,9 +61,7 @@ int main(int argc, char* argv[]){
 		totalRate += rate;
 		dualServer[i].periods[0] = period;
 		dualServer[i].deadlines[0] = period;
-        dualServer[i].complete[0] = false;
-        dualServer[i].completion[0] = 0;
-		dualServer[i].sons = &leaf;
+		dualServer[i].son = &leaf;
 	}
 
 	if (totalRate % 100 != 0){
@@ -108,8 +106,8 @@ int pack(int first, int last, int pPos){
 	int serverNumber = 1;
 	primaryServer[pPos].name = 31+pPos;
 	primaryServer[pPos].rate = dualServer[first].rate;
-	primaryServer[pPos].taille = 1;
-	primaryServer[pPos].sons[0] = &(dualServer[first]);
+	primaryServer[pPos].size = 1;
+	primaryServer[pPos].son[0] = &(dualServer[first]);
 	dualServer[first].father = &(primaryServer[pPos]);
 
 	/* we use first-fit to put the DS in the PS */
@@ -119,8 +117,8 @@ int pack(int first, int last, int pPos){
 		for(j = pPos ; j < pPos+serverNumber ; j++){
 			if(primaryServer[j].rate + dualServer[i].rate <= 100){
 				primaryServer[j].rate += dualServer[i].rate;
-				primaryServer[j].sons[primaryServer[j].taille] = &(dualServer[i]);
-				primaryServer[j].taille++;
+				primaryServer[j].son[primaryServer[j].size] = &(dualServer[i]);
+				primaryServer[j].size++;
 				dualServer[i].father = &(primaryServer[j]);
 				place = 1;
 				break;
@@ -129,8 +127,8 @@ int pack(int first, int last, int pPos){
 		if(!place){
 			primaryServer[pPos+serverNumber].name = 31+pPos+serverNumber;
 			primaryServer[pPos+serverNumber].rate = dualServer[i].rate;
-			primaryServer[pPos+serverNumber].taille = 1;
-			primaryServer[pPos+serverNumber].sons[0] = &(dualServer[i]);
+			primaryServer[pPos+serverNumber].size = 1;
+			primaryServer[pPos+serverNumber].son[0] = &(dualServer[i]);
 			dualServer[i].father = &(primaryServer[pPos+serverNumber]);
 			serverNumber++;
 		}
@@ -150,16 +148,14 @@ int dual(int first, int last, int dPos){
 		dualServer[dPos+i].name = dPos+i+1;
 		dualServer[dPos+i].rate = 100-primaryServer[first+i].rate;
 		number = 0;
-		for(j = 0 ; j < primaryServer[first+i].taille ; j++){
-			for(k = 0 ; k < primaryServer[first+i].sons[j]->number ; k++){
-				dualServer[dPos+i].periods[number+k] = primaryServer[first+i].sons[j]->periods[k];
-				dualServer[dPos+i].deadlines[number+k] = primaryServer[first+i].sons[j]->deadlines[k];
-                dualServer[dPos+i].complete[number+k] = false;
-                dualServer[dPos+i].completion[number+k] = 0;
+		for(j = 0 ; j < primaryServer[first+i].size ; j++){
+			for(k = 0 ; k < primaryServer[first+i].son[j]->number ; k++){
+				dualServer[dPos+i].periods[number+k] = primaryServer[first+i].son[j]->periods[k];
+				dualServer[dPos+i].deadlines[number+k] = primaryServer[first+i].son[j]->deadlines[k];
 			}
 			number += k;
 		}
-		dualServer[dPos+i].sons = &primaryServer[first+i];
+		dualServer[dPos+i].son = &primaryServer[first+i];
 		primaryServer[first+i].father = &dualServer[dPos+i];
 		dualServer[dPos+i].number = number;
 	}
@@ -176,10 +172,10 @@ int reduce(int first, int last, int pPos, int dPos){
 int printD(DS server){
 	int i;
 	printf("\nserver number %d of rate %d. ", server.name, server.rate);
-	if(server.sons->name == 0)
+	if(server.son->name == 0)
 		printf("it is a leaf, meaning 'a real task', its father is %d and its period is %d \n", server.father->name, server.periods[0]);
 	else{
-		printf("its son is the server number %d, and its father is the server number %d its périods are ", server.sons->name, server.father->name);
+		printf("its son is the server number %d, and its father is the server number %d its périods are ", server.son->name, server.father->name);
 		for(i = 0 ; i < server.number ; i++)
 			printf("%d ", server.periods[i]);
 		printf("\n");
@@ -194,10 +190,9 @@ int printP(PS server){
 		printf("it is a root, ");
 	else
 		printf("its father is the server number %d, ", server.father->name);
-	printf("its sons are  number ");
-	for(i = 0 ; i < server.taille ; i++)
-		printf("%d ", server.sons[i]->name);
+	printf("its son are  number ");
+	for(i = 0 ; i < server.size ; i++)
+		printf("%d ", server.son[i]->name);
 	printf("\n");
 	return 1;
 }
-
