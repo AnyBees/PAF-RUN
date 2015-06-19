@@ -34,6 +34,14 @@ struct timespec ts;
 struct timespec nextperiod;
 //timeval tp;
 
+pthread_cond_t cv[30];
+
+int firstexec = -1;
+
+void Un_Thread(int *i);
+
+void Fonc1(int i);
+
 int main (int argc, char *argv[]){
   int i;
   int rate;
@@ -41,15 +49,12 @@ int main (int argc, char *argv[]){
   int totalrate;
   int nbr;
   int firstdeadline = 32767;
-  int firstexec = (int) NULL;
-  int nextexec = (int) NULL;
+  int nextexec = -1;
   int nextdeadline = 32767;
   int timeexec = 0;
   int TaskNbr;
 
-  void Un_Thread(void);
-
-  if (argc != (int) argv[1]){
+  if (argc != 2){
     printf("Usage : %s nombre-de-taches\n", argv[0]);
     exit(1);
   }
@@ -68,6 +73,7 @@ int main (int argc, char *argv[]){
 
     Tasks.periods[i] = period;
     Tasks.rate[i] = rate;
+	pthread_cond_init(&cv[i], NULL);
   }
 
   for (i = 0; i < TaskNbr; i++){
@@ -88,7 +94,8 @@ int main (int argc, char *argv[]){
   /* creation des threads  */
 
   for (i = 0; i < TaskNbr; i++){
-    pthread_create(&Threads[i], NULL, (void *) Un_Thread, NULL);
+	int j = i;
+    pthread_create(&Threads[i], NULL, (void *) Un_Thread, &j);
     printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
   }
 
@@ -113,6 +120,7 @@ int main (int argc, char *argv[]){
         nextexec = i; // Get the next task
       }
     }
+	pthread_cond_signal(&cv[firstexec]);
 
     clock_gettime(CLOCK_REALTIME, &ts); // Get the time
 
@@ -146,24 +154,26 @@ int main (int argc, char *argv[]){
                             Un_Thread
   Fonction executee par les threads.
   -----------------------------------------------------------------*/
-void Un_Thread(void){
-  pthread_t mon_tid;
-  void Fonc1(void);
+void Un_Thread(int *i){
+	int j = *i;
+	pthread_t mon_tid;
 
-  mon_tid = pthread_self();
-  printf("Thread (0x)%x : DEBUT\n", (int) mon_tid);
-  Fonc1();
-  printf("Thread (0x)%x : FIN\n", (int) mon_tid);
-  pthread_exit(NULL);
+	mon_tid = pthread_self();
+	printf("Thread (0x)%x : DEBUT\n", (int) mon_tid);
+	Fonc1(j);
+	printf("Thread (0x)%x : FIN\n", (int) mon_tid);
+	pthread_exit(NULL);
 }
 
 /*-----------------------------------------------------------------
   Fonc1
   -----------------------------------------------------------------*/
-void Fonc1(void){
-  int i, Nbre_Iter;
-  Nbre_Iter = random()/10;
-  i=0;
-  while(i < Nbre_Iter) i++;
-  return;
+void Fonc1(int i){
+	pthread_mutex_lock(&Shared_T.Lock);
+	while(firstexec != i){
+		pthread_cond_wait(&cv[i], &Shared_T.Lock);
+	}
+	// Consomme CPU
+	pthread_mutex_unlock(&Shared_T.Lock);
+	return;
 }
