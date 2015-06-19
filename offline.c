@@ -36,23 +36,31 @@ int main(int argc, char* argv[]){
 	/* Input des tasks */
 
 	if (argc != 2) {
-		printf("task number : %s\n", argv[0]);
+		printf("You must give the input file %s\n", argv[0]);
 		return 1;
 	}
 
-	number = atoi(argv[1]);
+	FILE * fp;
+
+	fp = fopen (argv[1], "r");
+
+	if(fp == NULL){
+		printf("No such file found %s\n", argv[1]);
+		return 1;
+	}
+
+	res = fscanf(fp, "%d", &number);
 
 	totalRate = 0;
 
 	for( i = 0 ; i<number ; i++){
-		printf("period and rate of use (between 0 and 100) for task number %d ?\n", i+1);
-		res = scanf("%d %d", &period, &rate);
+		res = fscanf(fp, "%d %d", &period, &rate);
 		if(res != 2){
-			printf("use: period rate !\n");
+			printf("Error in input file !\n");
 			return 1;
 		}
 		if(rate > 100){
-			printf("The use rate  must lower than 100 !\n");
+			printf("The use rate  must be lower than 100 !\n");
 			return 1;
 		}
 		dualServer[i].name = i+1;
