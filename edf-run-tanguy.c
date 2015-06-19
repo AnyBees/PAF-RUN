@@ -49,14 +49,9 @@ int main (int argc, char *argv[]){
   int totalrate;
   int nbr;
   int firstdeadline = 32767;
-  int nextperiodtime;
-  int firstexec = (int) NULL;
-  int nextexec = (int) NULL;
-=======
   int nextexec = -1;
->>>>>>> origin/master
   int nextdeadline = 32767;
-  // int timeexec = 0;
+  int timeexec = 0;
   int TaskNbr;
 
   if (argc != 2){
@@ -106,19 +101,9 @@ int main (int argc, char *argv[]){
 
   while (1){
 
-    clock_gettime(CLOCK_REALTIME, &ts); // Get the time
-    clock_gettime(CLOCK_REALTIME, &nextperiod); // Get the time
-
-    nextperiodtime = 32767;
-
     for (i = 0; i < TaskNbr; i++){
       /* Check which task has the first deadline
       *  Only if the task has not been completed for this period*/
-      if (Tasks.deadlines[i] < firstdeadline) {
-        // Get the next task start
-        nextperiod.tv_sec += Tasks.deadlines[i];
-      }
-
       if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
         firstdeadline = Tasks.deadlines[i]; // Get the first deadline
         firstexec = i; // Get the first task
@@ -136,6 +121,8 @@ int main (int argc, char *argv[]){
       }
     }
 	pthread_cond_signal(&cv[firstexec]);
+
+    clock_gettime(CLOCK_REALTIME, &ts); // Get the time
 
     /* If the next task needs to be executed sooner than at the end
     *  of the first task execution time*/
@@ -189,15 +176,4 @@ void Fonc1(int i){
 	// Consomme CPU
 	pthread_mutex_unlock(&Shared_T.Lock);
 	return;
-}
-
-int gettime(){
-  struct timeval tv;
-  int usec;
-
-  if ((s.tv_sec == 0) && (s.tv_usec == 0)) return 0;
-
-  gettimeofday(&tv, NULL);
-  usec=(tv.tv_sec - s.tv_sec) * 1000000 + (tv.tv_usec - s.tv_usec);
-  return (Time)usec;
 }
