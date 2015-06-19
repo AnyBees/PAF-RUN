@@ -52,9 +52,9 @@ int main (int argc, char *argv[]){
   int nextperiodtime;
   int firstexec = (int) NULL;
   int nextexec = (int) NULL;
-=======
+
   int nextexec = -1;
->>>>>>> origin/master
+  origin/master
   int nextdeadline = 32767;
   // int timeexec = 0;
   int TaskNbr;
@@ -98,11 +98,11 @@ int main (int argc, char *argv[]){
 
   /* creation des threads  */
 
-  for (i = 0; i < TaskNbr; i++){
+  /*for (i = 0; i < TaskNbr; i++){
 	int j = i;
     pthread_create(&Threads[i], NULL, (void *) Un_Thread, &j);
     printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
-  }
+  }*/
 
   while (1){
 
@@ -135,7 +135,7 @@ int main (int argc, char *argv[]){
         nextexec = i; // Get the next task
       }
     }
-	pthread_cond_signal(&cv[firstexec]);
+	//pthread_cond_signal(&cv[firstexec]);
 
     /* If the next task needs to be executed sooner than at the end
     *  of the first task execution time*/
