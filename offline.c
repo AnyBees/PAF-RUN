@@ -1,12 +1,13 @@
 #include "structures.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 DS dualServer[30];
 PS primaryServer[30];
 
-int pack(int first, int last, int pPos);	//  Groups the duals servers and return the created servers number
-int dual(int first, int last, int dPos);	// Creat the dual of each primary server 
+int pack(int first, int last, int pPos);	//  Groups the duals servers in dualServer[first ... last-1] and appends the created primary servers in primaryservers beginning at range pPos
+int dual(int first, int last, int dPos);	// Creat the dual of each primary server in primaryServer[first ... last-1] and appends the created dual servers in primaryservers beginning at range dPos
 int reduce(int first, int last, int pPos, int dPos);
 int printD(DS server);
 int printP(PS server);
@@ -14,6 +15,7 @@ int printP(PS server);
 int main(int argc, char* argv[]){
 
 	int i;
+	int j;
 	int period;
 	int res;
 	int rate;
@@ -22,6 +24,7 @@ int main(int argc, char* argv[]){
 	int pPos;
 	int dPos;
 	int pCreates;
+	char out[80];
 
 	PS leaf;
 	leaf.name = 0;
@@ -39,13 +42,15 @@ int main(int argc, char* argv[]){
 		printf("You must give the input file %s\n", argv[0]);
 		return 1;
 	}
+	
+	strcpy(out, argv[1]);
 
 	FILE * fp;
 
-	fp = fopen (argv[1], "r");
+	fp = fopen (strcat(argv[1],".cfg"), "r");
 
 	if(fp == NULL){
-		printf("No such file found %s\n", argv[1]);
+		printf("No such file found (don't write the .cfg)%s\n", strcat(argv[1],".cfg"));
 		return 1;
 	}
 
@@ -72,6 +77,8 @@ int main(int argc, char* argv[]){
 		dualServer[i].son = &leaf;
 	}
 
+	fclose(fp);
+
 	/*if (totalRate % 100 != 0){
 		printf("The total use rate isn't a multiple of 100 (%d) \n", totalRate);
 		return 1;
@@ -86,19 +93,34 @@ int main(int argc, char* argv[]){
 	while(pCreates > 1){
 		dPos += pCreates;
 		pCreates = reduce(pPos-pCreates, pPos, pPos, dPos-pCreates);
-		pPos += pCreates;
-		
+		pPos += pCreates;		
 	}
 
 	primaryServer[pPos-1].father = &root;
 
+	fp = fopen (strcat(out,".off"), "w");
+
+	fprintf(fp, "%d\n", dPos);
+
 	for(i = 0 ; i<dPos ; i++){
+		fprintf(fp, "begin\n%d\n%d\n%d\n", dualServer[i].name, dualServer[i].rate, dualServer[i].number);
+		for(j = 0 ; j<dualServer[i].number ; j++)
+			fprintf(fp, "%d ", dualServer[i].periods[j]);
+		fprintf(fp, "\n%d\n%d\nend\n", dualServer[i].father->name, dualServer[i].son->name);
 		printD(dualServer[i]);
 	}
 
+	fprintf(fp, "%d\n", pPos);
+
 	for(i = 0 ; i<pPos ; i++){
+		fprintf(fp, "begin\n%d\n%d\n%d\n%d\n", primaryServer[i].name, primaryServer[i].rate, primaryServer[i].father->name, primaryServer[i].size);
+		for(j = 0 ; j<primaryServer[i].size ; j++)
+			fprintf(fp, "%d ", primaryServer[i].son[j]->name);
+		fprintf(fp, "\nend\n");
 		printP(primaryServer[i]);			
 	}
+
+	fclose(fp);
 	
 	return 0;
 
@@ -183,7 +205,7 @@ int printD(DS server){
 	if(server.son->name == 0)
 		printf("it is a leaf, meaning 'a real task', its father is %d and its period is %d \n", server.father->name, server.periods[0]);
 	else{
-		printf("its son is the server number %d, and its father is the server number %d its périods are ", server.son->name, server.father->name);
+		printf("his son is the server number %d, and his father is the server number %d its periods are ", server.son->name, server.father->name);
 		for(i = 0 ; i < server.number ; i++)
 			printf("%d ", server.periods[i]);
 		printf("\n");
@@ -197,8 +219,8 @@ int printP(PS server){
 	if(server.father->name == 0)
 		printf("it is a root, ");
 	else
-		printf("its father is the server number %d, ", server.father->name);
-	printf("its son are  number ");
+		printf("his father is the server number %d, ", server.father->name);
+	printf("his sons are number ");
 	for(i = 0 ; i < server.size ; i++)
 		printf("%d ", server.son[i]->name);
 	printf("\n");
