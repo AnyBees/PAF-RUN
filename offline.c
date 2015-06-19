@@ -45,13 +45,13 @@ int main(int argc, char* argv[]){
 	totalRate = 0;
 
 	for( i = 0 ; i<number ; i++){
-		printf("period and rate of use (between 1 and 99) for task number %d ?\n", i+1);
+		printf("period and rate of use (between 0 and 100) for task number %d ?\n", i+1);
 		res = scanf("%d %d", &period, &rate);
 		if(res != 2){
 			printf("use: period rate !\n");
 			return 1;
 		}
-		if(rate > 99){
+		if(rate > 100){
 			printf("The use rate  must lower than 100 !\n");
 			return 1;
 		}
@@ -64,10 +64,10 @@ int main(int argc, char* argv[]){
 		dualServer[i].son = &leaf;
 	}
 
-	if (totalRate % 100 != 0){
+	/*if (totalRate % 100 != 0){
 		printf("The total use rate isn't a multiple of 100 (%d) \n", totalRate);
 		return 1;
-	}
+	}*/
 
 	dPos = number;
 	pPos = 0;
