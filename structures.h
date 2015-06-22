@@ -1,5 +1,6 @@
 typedef struct PS PS;
 typedef struct DS DS;
+typedef struct TSK TSK;
 
 struct DS;
 
@@ -19,17 +20,20 @@ struct DS			// dual server
 	int number;		// number of task in the server
 	int periods[30];	// Tasks periods of server
 	int deadlines[30];	// Next deadline associate with each periods
-	// _Bool complete[30]; // Indicates for each period if the task was completed already
-	// int completion[30]; // Completion rate of task for given period
 	PS *son;		// The only son in the tree ( the name 0 if is a task)
 	PS *father;		// useful to recover the deadlines to hight level DS of the tree
 };
 
 struct TSK {
-	int rate[10];
-	int number[10];
-	int periods[10];
-	int deadlines[10];
-	_Bool complete[10];
-	int completion[10];
+	float WCET;
+	int number;
+	float period;
+	float deadline;
+	_Bool complete;
+	TSK *next;
+	TSK *previous;
 };
+
+struct lTSK {
+	TSK *first;
+}
