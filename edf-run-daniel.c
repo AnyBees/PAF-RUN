@@ -89,6 +89,7 @@ int main (int argc, char *argv[]){
     }
 
     Tasks.periods[i] = period;
+    Tasks.deadlines[i]= period;
     Tasks.rate[i] = rate;
 	// pthread_cond_init(&cv[i], NULL);
   }
@@ -195,7 +196,6 @@ void TaskExec(void *arg){
   int TaskNbrExec = args->TaskN;
 
   pthread_mutex_lock(&Shared_T.Lock);
-  TaskNbrExec++;
 
   printf("La valeur de w = %d\n", w);
   printf("La valeur de q = %d\n", q);
@@ -204,13 +204,20 @@ void TaskExec(void *arg){
     if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
       firstdeadline = Tasks.deadlines[i];
       firstexec = i;
-      printf("La tache prioritaire est %d\n", firstexec);
     }
+} 
+  printf("La tache prioritaire est %d\n", firstexec);
+  printf("La valeur de q = %d\n", q);
 
   while (q < w*1000){
     printf("on est dans la boucle  %d\n", firstexec);
+    timeis = gettime();
+      while (gettime() <= timeis + q){
+        usleep(q/10);
+        printf("J'ai attendu %d ms\n", q/10);
     if (TaskNbrExec > 1){
       pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
+       printf("le wait ok ");
       for (i= 0; i < TaskNbrExec; i++){
         if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
           firstdeadline = Tasks.deadlines[i];
@@ -220,16 +227,16 @@ void TaskExec(void *arg){
       }
     }
 
-    pthread_mutex_unlock(&Shared_T.Lock);
+    //pthread_mutex_unlock(&Shared_T.Lock);
 
-    while (q <= w*1000){
+   /* while (q <= w*1000){
       timeis = gettime();
       while (gettime() <= timeis + q){
         usleep(q/10);
         printf("J'ai attendu %d ms\n", q/10);
-      }
+      }*/
 
-      pthread_mutex_lock(&Shared_T.Lock);
+     // pthread_mutex_lock(&Shared_T.Lock);
 
       if (q <= w*1000 && Tasks.deadlines[firstexec] > firstdeadline){
           pthread_cond_broadcast(&Shared_T.Cond_Var);
@@ -248,7 +255,6 @@ void TaskExec(void *arg){
       Tasks.deadlines[firstexec] += Tasks.periods[firstexec];
       Tasks.complete[firstexec] = 1;
 
-      TaskNbrExec--;
       pthread_cond_broadcast (&Shared_T.Cond_Var);
 
       printf("Je relache la Variable Conditionnelle\n");
@@ -257,4 +263,4 @@ void TaskExec(void *arg){
     }
   }
 }
-}
+
