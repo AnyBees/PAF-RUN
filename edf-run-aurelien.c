@@ -109,7 +109,7 @@ int main (int argc, char *argv[]){
 
   for (i = 0; i < TaskNbr; i++){
     if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
-      arguments_Task.timec = Tasks.periods[i]*Tasks.rate[i];
+      arguments_Task.timec = Tasks.periods[i]*Tasks.rate[i]*0.01;
   }
 
   /* creation des threads  */
@@ -119,6 +119,8 @@ int main (int argc, char *argv[]){
     pthread_create(&Threads[i], NULL, (void *)TaskExec, &arguments_Task);
     printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
   }
+
+  sleep(10);
 
 }
 
@@ -228,7 +230,7 @@ void TaskExec(void *arg){
 
   //struct arguments args = arg;
 
-  int q = 10000;
+  int q = 1000;
   int i = 0;
   int firstdeadline = 32767;
   int firstexec = 0;
@@ -244,34 +246,40 @@ void TaskExec(void *arg){
   pthread_mutex_lock(&Shared_T.Lock);
   TaskNbrExec++;
 
+  printf("La valeur de w = %d\n", w);
+  printf("La valeur de q = %d\n", q);
+
   for (i= 0; i < TaskNbrExec; i++){
     if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
       firstdeadline = Tasks.deadlines[i];
       firstexec = i;
+      printf("La tache prioritaire est %d\n", firstexec);
     }
 
-  while (q <= w){
+  while (q <= w*1000){
     if (TaskNbrExec > 1){
       pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
       for (i= 0; i < TaskNbrExec; i++){
         if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
           firstdeadline = Tasks.deadlines[i];
           firstexec = i;
+          printf("La tache prioritaire est %d\n", firstexec);
         }
       }
     }
 
     pthread_mutex_unlock(&Shared_T.Lock);
 
-    while (q <= w){
+    while (q <= w*1000){
       timeis = gettime();
       while (gettime() <= timeis + q){
         usleep(q/10);
+        printf("J'ai attendu %d ms\n", q/10);
       }
 
       pthread_mutex_lock(&Shared_T.Lock);
 
-      if (q <= w && Tasks.deadlines[firstexec] > firstdeadline){
+      if (q <= w*1000 && Tasks.deadlines[firstexec] > firstdeadline){
           pthread_cond_broadcast(&Shared_T.Cond_Var);
       }
 
@@ -282,7 +290,7 @@ void TaskExec(void *arg){
       if (Tasks.deadlines[firstexec] > firstdeadline) break;
     }
 
-    if (w < q) {
+    if (w*1000 < q) {
       pthread_mutex_lock (&Shared_T.Lock);
 
       Tasks.deadlines[firstexec] += Tasks.periods[firstexec];
@@ -290,6 +298,8 @@ void TaskExec(void *arg){
 
       TaskNbrExec--;
       pthread_cond_broadcast (&Shared_T.Cond_Var);
+
+      printf("Je relache la Variable Conditionnelle\n");
 
       pthread_mutex_unlock (&Shared_T.Lock);
     }
