@@ -167,12 +167,9 @@ void Fonc1(int i){
 
 struct timeval s = {0,0};
 
-int gettime(){ // Get the time
+float gettime(){ // Get the time
   struct timeval tv;
   int usec;
-
-  if ((s.tv_sec == 0) && (s.tv_usec == 0)) return 0;
-
   gettimeofday(&tv, NULL);
   usec=(tv.tv_sec - s.tv_sec) * 1000000 + (tv.tv_usec - s.tv_usec);
   return usec;
@@ -182,11 +179,11 @@ void TaskExec(void *arg){
 
   //struct arguments args = arg;
 
-  int q = 1000;
+  float q = 1000;
   int i = 0;
   int firstdeadline = 32767;
   int firstexec = 0;
-  int timeis = 0;
+  float timeis = 0;
   //int w = 0;
   //int timeexecute = 0;
 
@@ -209,15 +206,20 @@ void TaskExec(void *arg){
   printf("La tache prioritaire est %d\n", firstexec);
   printf("La valeur de q = %d\n", q);
 
-  while (q < w*1000){
+  while (q < w*1000000){
     printf("on est dans la boucle  %d\n", firstexec);
     timeis = gettime();
+    printf("timeis vaut  %d\n", timeis);
       while (gettime() <= timeis + q){
         usleep(q/10);
         printf("J'ai attendu %d ms\n", q/10);
+	pthread_cond_broadcast(&Shared_T.Cond_Var);
+}  
+    Tasks.complete[firstexec] = 1;
     if (TaskNbrExec > 1){
       pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
-       printf("le wait ok ");
+      // pthread_cond_broadcast(&Shared_T.Cond_Var);
+       printf("le wait ok\n ");
       for (i= 0; i < TaskNbrExec; i++){
         if (Tasks.deadlines[i] < firstdeadline && !Tasks.complete[i]){
           firstdeadline = Tasks.deadlines[i];
@@ -238,7 +240,7 @@ void TaskExec(void *arg){
 
      // pthread_mutex_lock(&Shared_T.Lock);
 
-      if (q <= w*1000 && Tasks.deadlines[firstexec] > firstdeadline){
+      if (q <= w*1000000 && Tasks.deadlines[firstexec] > firstdeadline){
           pthread_cond_broadcast(&Shared_T.Cond_Var);
       }
 
@@ -247,9 +249,9 @@ void TaskExec(void *arg){
       w = w - (gettime () - timeis);
 
       if (Tasks.deadlines[firstexec] > firstdeadline) break;
-    }
+    
 
-    if (w*1000 < q) {
+    if (w*1000000 < q) {
       pthread_mutex_lock (&Shared_T.Lock);
 
       Tasks.deadlines[firstexec] += Tasks.periods[firstexec];
