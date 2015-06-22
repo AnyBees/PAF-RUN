@@ -7,7 +7,8 @@ struct DS;
 struct PS			// Primary server
 {
 	int name;		// name of server
-	int rate;		// rate of utilisation (percentage)
+	int ratenum;		// rate of utilisation (num/div)
+	int rateden;
 	int size;		// number of sons to look for EDF
 	DS *son[10];	        // Pointers to the sons of tree
 	DS *father;		//useful to recover the deadlines to hight level DS of the tree
@@ -16,7 +17,8 @@ struct PS			// Primary server
 struct DS			// dual server
 {
 	int name;		// Name of server
-	int rate;		// rate of utilisation
+	int ratenum;		// rate of utilisation (num/div)
+	int rateden;
 	int number;		// number of task in the server
 	int periods[30];	// Tasks periods of server
 	int deadlines[30];	// Next deadline associate with each periods
@@ -36,4 +38,4 @@ struct TSK {
 
 struct lTSK {
 	TSK *first;
-}
+};
