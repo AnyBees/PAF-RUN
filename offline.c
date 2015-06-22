@@ -24,7 +24,6 @@ int main(int argc, char* argv[]){
 	int pPos;
 	int dPos;
 	int pCreates;
-	int sub;
 	char out[80];
 
 	PS leaf;
@@ -61,13 +60,12 @@ int main(int argc, char* argv[]){
 	while(res == 2){		
 		res = fscanf(fp, "%d %d", &period, &wcet);
 		if(wcet > period){
-			printf("Worst case execution tome must be lower than periodn");
+			printf("Worst case execution time must be lower than period\n");
 			return 1;
 		}
-		sub = pgcd(period, wcet);
 		dualServer[i].name = i+1;
-		dualServer[i].ratenum = wcet/sub;
-		dualServer[i].rateden = period/sub;
+		dualServer[i].ratenum = wcet;
+		dualServer[i].rateden = period;
 		dualServer[i].number = 1;
 		dualServer[i].periods[0] = period;
 		dualServer[i].deadlines[0] = period;
