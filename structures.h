@@ -26,10 +26,16 @@ struct DS			// dual server
 };
 
 struct TSK {
-	int rate[10];
-	int number[10];
-	int periods[10];
-	int deadlines[10];
-	_Bool complete[10];
-	int completion[10];
+	int rate ;
+	int number;
+	int periods;
+	int deadlines;
+	_Bool complete;
+	int completion;
 };
+struct lTSK {
+	int deadline ;
+	int tid ;
+	struct lTSK *next ;
+	struct lTSK *previous ;
+}
