@@ -102,6 +102,11 @@ int main (int argc, char *argv[]){
 void *TaskExec(void *i){
 
   int nbr = *((int *) i);
+  int k;
+
+  Tasks[nbr].active = 1;
+
+  while(1){
 
   float w = Tasks[nbr].WCET;
 	printf("w%d = %f\n", nbr, w);
@@ -118,6 +123,17 @@ void *TaskExec(void *i){
 
     texec += q;
 
+    for (k = 1; k <= TaskNbr; k++){
+      if (k != nbr){
+        if (texec >= (Tasks[k].complete)*(Tasks[k].period)){
+          Tasks[k].active = 1;
+          activate(k);
+        }
+      }
+    }
+
+    printf("texec = %d\n", texec);
+
   }
 
   complete(nbr);
@@ -125,6 +141,8 @@ void *TaskExec(void *i){
   //free(i);
 
 return 0;
+
+}
 
 }
 
@@ -162,6 +180,7 @@ void complete(int nbr){
   Tasks[nbr].deadline += Tasks[nbr].period;
 
   Tasks[nbr].complete++;
+  Tasks[nbr].active = 0;
 	Tasks[nbr].previous->next =Tasks[nbr].next;
 	Tasks[nbr].next->previous =Tasks[nbr].previous;
 	Tasks[nbr].next = 0;

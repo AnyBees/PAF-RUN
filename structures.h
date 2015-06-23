@@ -33,6 +33,7 @@ struct TSK {
 	float period;
 	float deadline;
 	int complete;
+	_Bool active;
 	TSK *next;
 	TSK *previous;
 };
