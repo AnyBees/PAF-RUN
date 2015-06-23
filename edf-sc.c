@@ -28,6 +28,8 @@ void insertion(lTSK *lTasks, int nbr);
 
 lTSK lTasks;
 
+int TaskNbr;
+
 int main (int argc, char *argv[]){
 
   int i;
@@ -35,7 +37,6 @@ int main (int argc, char *argv[]){
   float wcet;
   float period;
   float totalrate = 0;
-  int TaskNbr;
 
   if (argc != 2){
     printf("Usage : %s nombre-de-taches\n", argv[0]);
@@ -46,7 +47,9 @@ int main (int argc, char *argv[]){
 
   printf("Quels sont le WCET et la periode pour chaque tache ?\n");
 
-  for (i = 0; i < TaskNbr; i++){
+  Tasks[0].number = 0;
+
+  for (i = 1; i <= TaskNbr; i++){
     nbr = scanf("%f %f", &wcet, &period);
     if (nbr != 2){
       printf("L'usage est WCET-tache periode-tache\n");
@@ -116,6 +119,8 @@ void *TaskExec(void *i){
 
   //free(i);
 
+return 0;
+
 }
 
 void activate (int nbr){
@@ -177,11 +182,15 @@ void insertion(lTSK *lTasks, int nbr){
     exit(EXIT_FAILURE);
   }*/
 
-  for (i = 0; i < ; i++){
+  for (i = 1; i <= TaskNbr; i++){
 
     if (Tasks[i].deadline > Tasks[nbr].deadline){
 
-      if ((Tasks[i].previous)->deadline < Tasks[nbr].deadline && Tasks[i].previous != NULL){
+      printf("Fonction insertion lancée\n");
+
+      if ((Tasks[i].previous)->deadline < Tasks[nbr].deadline && (Tasks[i].previous)->number != 0){
+
+	printf("Go 1");
 
         (Tasks[i].previous)->next = &Tasks[nbr];
         Tasks[nbr].previous = Tasks[i].previous;
@@ -193,6 +202,8 @@ void insertion(lTSK *lTasks, int nbr){
       }
 
       else if (Tasks[i].previous == NULL){
+
+	printf("Go 2");
 
         Tasks[nbr].previous = NULL;
         Tasks[nbr].next = &Tasks[i];
