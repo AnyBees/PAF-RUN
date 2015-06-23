@@ -29,6 +29,7 @@ void insertion(lTSK *lTasks, int nbr);
 lTSK lTasks;
 
 int TaskNbr;
+int texec = 0;
 
 int main (int argc, char *argv[]){
 
@@ -48,6 +49,7 @@ int main (int argc, char *argv[]){
   printf("Quels sont le WCET et la periode pour chaque tache ?\n");
 
   Tasks[0].number = 0;
+	Tasks[0].next = 0;
 
   for (i = 1; i <= TaskNbr; i++){
     nbr = scanf("%f %f", &wcet, &period);
@@ -60,9 +62,10 @@ int main (int argc, char *argv[]){
     Tasks[i].deadline = period*1000;
     Tasks[i].WCET = wcet*1000;
     Tasks[i].complete = 0;
+		Tasks[i].next = 0;
   }
 
-  for (i = 0; i < TaskNbr; i++){
+  for (i = 1; i <= TaskNbr; i++){
     totalrate += (Tasks[i].WCET/Tasks[i].period)*100;
   }
 
@@ -77,14 +80,21 @@ int main (int argc, char *argv[]){
   pthread_cond_init(&Shared_T.Cond_Var, NULL);
   pthread_mutex_init(&Shared_T.Lock, NULL);
 
-  for (i = 0; i < TaskNbr; i++){
+  pthread_mutex_lock(&Shared_T.Lock);
+
+  for (i = 1; i <= TaskNbr; i++){
     int *arg = malloc(sizeof(*arg));
     *arg = i;
     pthread_create(&Threads[i], NULL, TaskExec, arg);
     printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
   }
 
-  sleep(10);
+  sleep(2);
+
+  pthread_mutex_unlock(&Shared_T.Lock);
+
+	sleep(10);
+
 	return 0;
 
 }
@@ -93,22 +103,17 @@ void *TaskExec(void *i){
 
   int nbr = *((int *) i);
 
-  printf("Nombre = %d\n", nbr);
-
   float w = Tasks[nbr].WCET;
+	printf("w%d = %f\n", nbr, w);
   float q = 1000;
-  int texec = 0;
-
-  printf("Lancement fonction activate imminent\n");
 
   activate(nbr);
 
-  printf("Fonction activate terminée\n");
-
-  while(w > q){
+  while(w >= q){
 
     proceed(nbr);
     usleep(q);
+		printf("Tache %d a consomme un quantum\n", nbr);
     w -= q;
 
     texec += q;
@@ -141,7 +146,7 @@ void proceed(int nbr){
 
   pthread_mutex_lock(&Shared_T.Lock);
 
-  while(lTasks.first != &Tasks[nbr]){
+  while(Tasks[0].next != &Tasks[nbr]){
     printf("Tâche %d en attente de passer prioritaire\n", nbr);
     pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
   }
@@ -176,46 +181,33 @@ lTSK *initialisation(int nbr){
 
 void insertion(lTSK *lTasks, int nbr){
 
-  int i;
+  int i=0;
+	int inserted = 0;
 
   /*if (*lTasks == NULL || *Tasks[nbr]  == NULL){
     exit(EXIT_FAILURE);
   }*/
 
-  for (i = 1; i <= TaskNbr; i++){
+	while(Tasks[i].next != 0){
+		if(Tasks[i].next->deadline > Tasks[nbr].deadline){
+			Tasks[nbr].next = Tasks[i].next;
+			Tasks[i].next = &Tasks[nbr];
+			Tasks[nbr].previous = &Tasks[i];
+			Tasks[nbr].next->previous = &Tasks[nbr];
+			inserted = 1;
+			printf("Tâche %d ajoutée après %d\n", nbr, (Tasks[nbr].previous)->number);
+			break;
+		}
+		else
+			i = Tasks[i].next->number;
+	}
 
-    if (Tasks[i].deadline > Tasks[nbr].deadline){
+	if (!inserted){
 
-      printf("Fonction insertion lancée\n");
+		Tasks[nbr].previous = &Tasks[i];
+    Tasks[i].next = &Tasks[nbr];
 
-      if ((Tasks[i].previous)->deadline < Tasks[nbr].deadline && (Tasks[i].previous)->number != 0){
-
-	printf("Go 1");
-
-        (Tasks[i].previous)->next = &Tasks[nbr];
-        Tasks[nbr].previous = Tasks[i].previous;
-        Tasks[i].previous = &Tasks[nbr];
-        Tasks[nbr].next = &Tasks[i];
-
-        printf("Tâche ajoutée entre %d et %d\n", (Tasks[nbr].previous)->number, (Tasks[nbr].next)->number);
-
-      }
-
-      else if (Tasks[i].previous == NULL){
-
-	printf("Go 2");
-
-        Tasks[nbr].previous = NULL;
-        Tasks[nbr].next = &Tasks[i];
-        Tasks[i].previous = &Tasks[nbr];
-        lTasks->first = &Tasks[nbr];
-
-        printf("Tâche %d ajoutée en première position\n", nbr);
-
-      }
-
-    }
-
-  }
+		printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
+	}
 
 }
