@@ -109,7 +109,7 @@ void *TaskExec(void *i){
 
   activate(nbr);
 
-  while(w >= q){
+  while(w >= q && !Tasks[nbr].complete){
 
     proceed(nbr);
     usleep(q);
@@ -162,6 +162,10 @@ void complete(int nbr){
   Tasks[nbr].deadline += Tasks[nbr].period;
 
   Tasks[nbr].complete++;
+	Tasks[nbr].previous->next =Tasks[nbr].next;
+	Tasks[nbr].next->previous =Tasks[nbr].previous;
+	Tasks[nbr].next = 0;
+	Tasks[nbr].previous = 0;
 
   printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete);
 
