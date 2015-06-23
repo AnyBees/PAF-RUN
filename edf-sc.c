@@ -7,7 +7,7 @@
 #include "structures.h"
 #include <stdbool.h>
 
-#define MAX_TASKS = 256;
+#define MAX_TASKS 256
 
 typedef struct {
   pthread_cond_t  Cond_Var;
@@ -24,13 +24,17 @@ Shared_Task Shared_T;
 
 arguments_T arguments_Task;
 
-struct TSK[MAX_TASKS] Tasks;
+struct TSK Tasks[MAX_TASKS];
 
-void TaskExec(double deadline);
+void TaskExec(float d, int nbr);
+int activate(float d, int nbr);
+void proceed(int n);
+void complete(int n);
 
 int main (int argc, char *argv[]){
 
   int i;
+  int nbr;
   float wcet;
   float period;
   float totalrate = 0;
@@ -46,7 +50,7 @@ int main (int argc, char *argv[]){
   printf("Quels sont le WCET et la periode pour chaque tache ?\n");
 
   for (i = 0; i < TaskNbr; i++){
-    nbr = scanf("%lf %lf", &wcet, &period);
+    nbr = scanf("%f %f", &wcet, &period);
     if (nbr != 2){
       printf("L'usage est WCET-tache periode-tache\n");
     }
@@ -81,6 +85,7 @@ int main (int argc, char *argv[]){
   }
 
   sleep(10);
+	return 0;
 
 }
 
@@ -94,7 +99,7 @@ void TaskExec(float d, int nbr){
 
   while(w > q){
 
-    continue(n);
+    proceed(n);
     usleep(q);
     w -= q;
 
@@ -107,10 +112,10 @@ void TaskExec(float d, int nbr){
 int activate(float d, int nbr){
 
   
-
+	return 0;
 }
 
-void continue(int n){
+void proceed(int n){
 
 
 
