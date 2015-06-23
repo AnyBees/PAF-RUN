@@ -131,8 +131,8 @@ void *TaskExec(void *i){
 
 	  complete(nbr);
 
-		while(texec < (Tasks[nbr].complete)*(Tasks[nbr].period)){
-		}
+		sleep((Tasks[nbr].complete)*(Tasks[nbr].period)-texec-500000);
+
 	  pthread_mutex_lock(&Shared_T.Lock);
     activate(nbr);
     Tasks[nbr].active = 1;
