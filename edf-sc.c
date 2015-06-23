@@ -127,6 +127,7 @@ void *TaskExec(void *i){
 
 		  texec += q;
 			pthread_mutex_unlock(&Shared_T.Lock);
+			usleep(1000);
 		}
 
 	  complete(nbr);
