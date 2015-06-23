@@ -1,6 +1,7 @@
 typedef struct PS PS;
 typedef struct DS DS;
 typedef struct TSK TSK;
+typedef struct lTSK lTSK;
 
 struct DS;
 
@@ -31,7 +32,7 @@ struct TSK {
 	int number;
 	float period;
 	float deadline;
-	_Bool complete;
+	int complete;
 	TSK *next;
 	TSK *previous;
 };

@@ -7,7 +7,7 @@
 #include "structures.h"
 #include <stdbool.h>
 
-#define MAX_TASKS 256
+#define MAX_TASKS 8
 
 typedef struct {
   pthread_cond_t  Cond_Var;
@@ -16,7 +16,7 @@ typedef struct {
 } Shared_Task;
 
 typedef struct {
-  int deadline;
+  float deadline;
   int number;
 } arguments_T;
 
@@ -24,12 +24,16 @@ Shared_Task Shared_T;
 
 arguments_T arguments_Task;
 
-struct TSK Tasks[MAX_TASKS];
+TSK Tasks[MAX_TASKS];
 
 void TaskExec(float d, int nbr);
-int activate(float d, int nbr);
-void proceed(int n);
-void complete(int n);
+void activate(int nbr);
+void proceed(int nbr);
+void complete(int nbr);
+lTSK *initialisation(int nbr);
+void insertion(lTSK *lTasks, int nbr);
+
+lTSK lTasks;
 
 int main (int argc, char *argv[]){
 
@@ -79,7 +83,9 @@ int main (int argc, char *argv[]){
 
   for (i = 0; i < TaskNbr; i++){
     arguments_Task.deadline = Tasks[i].deadline;
+    printf("deadline = %f\n", arguments_Task.deadline);
     arguments_Task.number = Tasks[i].number;
+    printf("tâche = %d\n", arguments_Task.number);
     pthread_create(&Threads[i], NULL, (void *)TaskExec, &arguments_Task);
     printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
   }
@@ -91,38 +97,117 @@ int main (int argc, char *argv[]){
 
 void TaskExec(float d, int nbr){
 
-  int n;
-  int w = Tasks[nbr].WCET;
-  int q = 1000;
+  float w = Tasks[nbr].WCET;
+  float q = 1000;
+  int texec = 0;
 
-  n = activate(d, nbr);
+  printf("Lancement fonction activate imminent\n");
+
+  activate(nbr);
+
+  printf("Fonction activate terminée\n");
 
   while(w > q){
 
-    proceed(n);
+    proceed(nbr);
     usleep(q);
     w -= q;
 
+    texec += q;
+
   }
 
-  complete(n);
+  complete(nbr);
 
 }
 
-int activate(float d, int nbr){
+void activate (int nbr){
 
-  
-	return 0;
+  lTSK lTsk;
+
+  lTSK *lTasks = malloc(sizeof(lTSK));
+
+  if (lTasks->first == NULL){
+    lTsk = *initialisation(nbr);
+  }
+
+  insertion(&lTsk, nbr);
+
 }
 
-void proceed(int n){
+void proceed(int nbr){
 
+  pthread_mutex_lock(&Shared_T.Lock);
 
+  while(lTasks.first != &Tasks[nbr]){
+    printf("Tâche %d en attente de passer prioritaire\n", nbr);
+    pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
+  }
+
+  pthread_mutex_unlock(&Shared_T.Lock);
 
 }
 
-void complete(int n){
+void complete(int nbr){
 
+  pthread_cond_broadcast(&Shared_T.Cond_Var);
 
+  Tasks[nbr].deadline += Tasks[nbr].period;
+
+  Tasks[nbr].complete++;
+
+  printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete);
+
+}
+
+lTSK *initialisation(int nbr){
+
+  /*if (*lTasks == NULL || *Tasks[nbr] == NULL){
+     exit(EXIT_FAILURE);
+  }*/
+  Tasks[nbr].next = NULL;
+  Tasks[nbr].previous = NULL;
+  lTasks.first = &Tasks[nbr];
+  return &lTasks;
+
+}
+
+void insertion(lTSK *lTasks, int nbr){
+
+  int i;
+
+  /*if (*lTasks == NULL || *Tasks[nbr]  == NULL){
+    exit(EXIT_FAILURE);
+  }*/
+
+  for (i = 0; i < MAX_TASKS; i++){
+
+    if (Tasks[i].deadline > Tasks[nbr].deadline){
+
+      if ((Tasks[i].previous)->deadline < Tasks[nbr].deadline && Tasks[i].previous != NULL){
+
+        (Tasks[i].previous)->next = &Tasks[nbr];
+        Tasks[nbr].previous = Tasks[i].previous;
+        Tasks[i].previous = &Tasks[nbr];
+        Tasks[nbr].next = &Tasks[i];
+
+        printf("Tâche ajoutée entre %d et %d\n", (Tasks[nbr].previous)->number, (Tasks[nbr].next)->number);
+
+      }
+
+      else if (Tasks[i].previous == NULL){
+
+        Tasks[nbr].previous = NULL;
+        Tasks[nbr].next = &Tasks[i];
+        Tasks[i].previous = &Tasks[nbr];
+        lTasks->first = &Tasks[nbr];
+
+        printf("Tâche %d ajoutée en première position\n", nbr);
+
+      }
+
+    }
+
+  }
 
 }
