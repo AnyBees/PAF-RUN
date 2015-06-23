@@ -58,9 +58,9 @@ int main (int argc, char *argv[]){
     }
 
     Tasks[i].number = i;
-    Tasks[i].period = period*1000;
-    Tasks[i].deadline = period*1000;
-    Tasks[i].WCET = wcet*1000;
+    Tasks[i].period = period*1000000;
+    Tasks[i].deadline = period*1000000;
+    Tasks[i].WCET = wcet*1000000;
     Tasks[i].complete = 0;
 		Tasks[i].next = 0;
   }
@@ -93,7 +93,7 @@ int main (int argc, char *argv[]){
 
   pthread_mutex_unlock(&Shared_T.Lock);
 
-	sleep(10);
+	sleep(60);
 
 	return 0;
 
@@ -102,41 +102,40 @@ int main (int argc, char *argv[]){
 void *TaskExec(void *i){
 
   int nbr = *((int *) i);
-  int k;
 
   Tasks[nbr].active = 1;
 
-  while(1){
-
   float w = Tasks[nbr].WCET;
 	printf("w%d = %f\n", nbr, w);
-  float q = 1000;
+  float q = 1000000;
 
   activate(nbr);
 
-  while(w >= q && !Tasks[nbr].complete){
+	while(true){
 
-    proceed(nbr);
-    usleep(q);
-		printf("Tache %d a consomme un quantum\n", nbr);
-    w -= q;
+		while(w >= q && Tasks[nbr].active){
 
-    texec += q;
+		  proceed(nbr);
+		  usleep(q);
+			printf("Tache %d a consomme un quantum\n", nbr);
+		  w -= q;
 
-    for (k = 1; k <= TaskNbr; k++){
-      if (k != nbr){
-        if (texec >= (Tasks[k].complete)*(Tasks[k].period)){
-          Tasks[k].active = 1;
-          activate(k);
-        }
-      }
-    }
+		  texec += q;
+		}
+
+	  complete(nbr);
+
+		while(texec < (Tasks[nbr].complete)*(Tasks[nbr].period)){
+		}
+
+    Tasks[nbr].active = 1;
+		w = Tasks[nbr].WCET;
+		printf("Tache %d va se reactiver\n", nbr);
+    activate(nbr);
 
     printf("texec = %d\n", texec);
 
   }
-
-  complete(nbr);
 
   //free(i);
 
@@ -144,11 +143,11 @@ return 0;
 
 }
 
-}
-
 void activate (int nbr){
 
   lTSK lTsk;
+
+  pthread_mutex_lock(&Shared_T.Lock);
 
   lTSK *lTasks = malloc(sizeof(lTSK));
 
@@ -157,6 +156,8 @@ void activate (int nbr){
   }
 
   insertion(&lTsk, nbr);
+
+  pthread_mutex_unlock(&Shared_T.Lock);
 
 }
 
