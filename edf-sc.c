@@ -21,7 +21,6 @@ TSK Tasks[MAX_TASKS];
 
 void *TaskExec(void *i);
 void activate(int nbr);
-void proceed(int nbr);
 void complete(int nbr);
 lTSK *initialisation(int nbr);
 void insertion(lTSK *lTasks, int nbr);
@@ -115,25 +114,33 @@ void *TaskExec(void *i){
 
 		while(w >= q && Tasks[nbr].active){
 
-		  proceed(nbr);
+			pthread_mutex_lock(&Shared_T.Lock);
+
+			while(Tasks[0].next != &Tasks[nbr]){
+				printf("Tâche %d en attente de passer prioritaire\n", nbr);
+				pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
+			}
+
 		  usleep(q);
 			printf("Tache %d a consomme un quantum\n", nbr);
 		  w -= q;
 
 		  texec += q;
+			pthread_mutex_unlock(&Shared_T.Lock);
 		}
 
 	  complete(nbr);
 
 		while(texec < (Tasks[nbr].complete)*(Tasks[nbr].period)){
 		}
-
+	  pthread_mutex_lock(&Shared_T.Lock);
+    activate(nbr);
     Tasks[nbr].active = 1;
 		w = Tasks[nbr].WCET;
 		printf("Tache %d va se reactiver\n", nbr);
-    activate(nbr);
 
     printf("texec = %d\n", texec);
+		pthread_mutex_unlock(&Shared_T.Lock);
 
   }
 
@@ -147,8 +154,6 @@ void activate (int nbr){
 
   lTSK lTsk;
 
-  pthread_mutex_lock(&Shared_T.Lock);
-
   lTSK *lTasks = malloc(sizeof(lTSK));
 
   if (lTasks->first == NULL){
@@ -156,21 +161,6 @@ void activate (int nbr){
   }
 
   insertion(&lTsk, nbr);
-
-  pthread_mutex_unlock(&Shared_T.Lock);
-
-}
-
-void proceed(int nbr){
-
-  pthread_mutex_lock(&Shared_T.Lock);
-
-  while(Tasks[0].next != &Tasks[nbr]){
-    printf("Tâche %d en attente de passer prioritaire\n", nbr);
-    pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
-  }
-
-  pthread_mutex_unlock(&Shared_T.Lock);
 
 }
 
