@@ -34,8 +34,8 @@ struct TSK {
 	float deadline;
 	int complete;
 	_Bool active;
-	TSK *next;
-	TSK *previous;
+	int next;
+	int previous;
 };
 
 struct lTSK {
