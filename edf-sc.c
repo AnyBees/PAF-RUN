@@ -178,6 +178,7 @@ void complete(int nbr){
 	Tasks[nbr].previous = 0;
 
   printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete);
+  activate(nbr);
 
 }
 
