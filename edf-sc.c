@@ -15,18 +15,11 @@ typedef struct {
   pthread_t       Thread_Id;
 } Shared_Task;
 
-typedef struct {
-  float deadline;
-  int number;
-} arguments_T;
-
 Shared_Task Shared_T;
-
-arguments_T arguments_Task;
 
 TSK Tasks[MAX_TASKS];
 
-void TaskExec(float d, int nbr);
+void *TaskExec(void *i);
 void activate(int nbr);
 void proceed(int nbr);
 void complete(int nbr);
@@ -59,7 +52,7 @@ int main (int argc, char *argv[]){
       printf("L'usage est WCET-tache periode-tache\n");
     }
 
-    Tasks[i].number = i+1;
+    Tasks[i].number = i;
     Tasks[i].period = period*1000;
     Tasks[i].deadline = period*1000;
     Tasks[i].WCET = wcet*1000;
@@ -82,11 +75,9 @@ int main (int argc, char *argv[]){
   pthread_mutex_init(&Shared_T.Lock, NULL);
 
   for (i = 0; i < TaskNbr; i++){
-    arguments_Task.deadline = Tasks[i].deadline;
-    printf("deadline = %f\n", arguments_Task.deadline);
-    arguments_Task.number = Tasks[i].number;
-    printf("tâche = %d\n", arguments_Task.number);
-    pthread_create(&Threads[i], NULL, (void *)TaskExec, &arguments_Task);
+    int *arg = malloc(sizeof(*arg));
+    *arg = i;
+    pthread_create(&Threads[i], NULL, TaskExec, arg);
     printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
   }
 
@@ -95,7 +86,11 @@ int main (int argc, char *argv[]){
 
 }
 
-void TaskExec(float d, int nbr){
+void *TaskExec(void *i){
+
+  int nbr = *((int *) i);
+
+  printf("Nombre = %d\n", nbr);
 
   float w = Tasks[nbr].WCET;
   float q = 1000;
@@ -118,6 +113,8 @@ void TaskExec(float d, int nbr){
   }
 
   complete(nbr);
+
+  //free(i);
 
 }
 
@@ -180,7 +177,7 @@ void insertion(lTSK *lTasks, int nbr){
     exit(EXIT_FAILURE);
   }*/
 
-  for (i = 0; i < MAX_TASKS; i++){
+  for (i = 0; i < ; i++){
 
     if (Tasks[i].deadline > Tasks[nbr].deadline){
 
