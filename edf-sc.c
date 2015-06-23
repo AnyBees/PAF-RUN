@@ -131,7 +131,9 @@ void *TaskExec(void *i){
 
 	  complete(nbr);
 
-		sleep((Tasks[nbr].complete)*(Tasks[nbr].period)-texec-500000);
+		printf("Sleep %f\n",(Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
+
+		usleep((Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
 
 	  pthread_mutex_lock(&Shared_T.Lock);
     activate(nbr);
