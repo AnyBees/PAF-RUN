@@ -24,17 +24,11 @@ int main(int argc, char* argv[]){
 	int pPos;
 	int dPos;
 	int pCreates;
+	int tauxTotalNum = 0;
+	int tauxTotalDen = 1;
+	int sub;
+	int nbproc;
 	char out[80];
-
-	PS leaf;
-	leaf.name = 0;
-	leaf.son[0] = 0;
-	leaf.father = 0;
-
-	DS root;
-	root.name = 0;
-	root.son = 0;
-	root.father = 0;
 
 	/* Input des tasks */
 
@@ -68,8 +62,14 @@ int main(int argc, char* argv[]){
 		dualServer[i].rateden = period;
 		dualServer[i].number = 1;
 		dualServer[i].periods[0] = period;
-		dualServer[i].deadlines[0] = period;
-		dualServer[i].son = &leaf;
+		dualServer[i].son = 0;
+		if(res == 2){
+			tauxTotalNum = tauxTotalNum*period+tauxTotalDen*wcet;
+			tauxTotalDen = tauxTotalDen*period;
+			sub = pgcd(tauxTotalDen, tauxTotalNum);
+			tauxTotalNum = tauxTotalNum/sub;
+			tauxTotalDen = tauxTotalDen/sub;
+		}
 		i++;
 	}
 
@@ -94,9 +94,16 @@ int main(int argc, char* argv[]){
 		pPos += pCreates;		
 	}
 
-	primaryServer[pPos-1].father = &root;
+	primaryServer[pPos-1].father = 0;
 
 	fp = fopen (strcat(out,".off"), "w");
+
+	if(tauxTotalNum%tauxTotalDen == 0)
+		nbproc = tauxTotalNum/tauxTotalDen;
+	else
+		nbproc = tauxTotalNum/tauxTotalDen + 1;
+
+	fprintf(fp, "Le systeme s'ordonnance sur %d processeurs\n\n", nbproc);
 
 	fprintf(fp, "number of dual servers = %d\n", dPos);
 
@@ -104,16 +111,16 @@ int main(int argc, char* argv[]){
 		fprintf(fp, "\nbegin D\nnumber = %d\nrate = %d/%d\nnumber of periods = %d\nperiods = ", dualServer[i].name, dualServer[i].ratenum, dualServer[i].rateden, dualServer[i].number);
 		for(j = 0 ; j<dualServer[i].number ; j++)
 			fprintf(fp, "%d ", dualServer[i].periods[j]);
-		fprintf(fp, "\nfather = %d\nson = %d\nend D\n", dualServer[i].father->name, dualServer[i].son->name);
+		fprintf(fp, "\nfather = %d\nson = %d\nend D\n", dualServer[i].father, dualServer[i].son);
 		printD(dualServer[i]);
 	}
 
 	fprintf(fp, "\nnumber of primary servers = %d\n", pPos);
 
 	for(i = 0 ; i<pPos ; i++){
-		fprintf(fp, "\nbegin P\nnumber = %d\nrate = %d/%d\nfather = %d\nnumber of sons = %d\nsons = ", primaryServer[i].name, primaryServer[i].ratenum, primaryServer[i].rateden, primaryServer[i].father->name, primaryServer[i].size);
+		fprintf(fp, "\nbegin P\nnumber = %d\nrate = %d/%d\nfather = %d\nnumber of sons = %d\nsons = ", primaryServer[i].name, primaryServer[i].ratenum, primaryServer[i].rateden, primaryServer[i].father, primaryServer[i].size);
 		for(j = 0 ; j<primaryServer[i].size ; j++)
-			fprintf(fp, "%d ", primaryServer[i].son[j]->name);
+			fprintf(fp, "%d ", primaryServer[i].son[j]);
 		fprintf(fp, "\nend P\n");
 		printP(primaryServer[i]);			
 	}
@@ -137,8 +144,8 @@ int pack(int first, int last, int pPos){
 	primaryServer[pPos].ratenum = dualServer[first].ratenum;
 	primaryServer[pPos].rateden = dualServer[first].rateden;
 	primaryServer[pPos].size = 1;
-	primaryServer[pPos].son[0] = &(dualServer[first]);
-	dualServer[first].father = &(primaryServer[pPos]);
+	primaryServer[pPos].son[0] = first+1;
+	dualServer[first].father = pPos+31;
 
 	/* we use first-fit to put the DS in the PS */
 
@@ -151,9 +158,9 @@ int pack(int first, int last, int pPos){
 				sub = pgcd(primaryServer[j].rateden, primaryServer[j].ratenum);
 				primaryServer[j].rateden = primaryServer[j].rateden/sub;
 				primaryServer[j].ratenum = primaryServer[j].ratenum/sub;
-				primaryServer[j].son[primaryServer[j].size] = &(dualServer[i]);
+				primaryServer[j].son[primaryServer[j].size] = i+1;
 				primaryServer[j].size++;
-				dualServer[i].father = &(primaryServer[j]);
+				dualServer[i].father = j+31;
 				place = 1;
 				break;
 			}
@@ -163,8 +170,8 @@ int pack(int first, int last, int pPos){
 			primaryServer[pPos+serverNumber].ratenum = dualServer[i].ratenum;
 			primaryServer[pPos+serverNumber].rateden = dualServer[i].rateden;
 			primaryServer[pPos+serverNumber].size = 1;
-			primaryServer[pPos+serverNumber].son[0] = &(dualServer[i]);
-			dualServer[i].father = &(primaryServer[pPos+serverNumber]);
+			primaryServer[pPos+serverNumber].son[0] = i+1;
+			dualServer[i].father = pPos+serverNumber+31;
 			serverNumber++;
 		}
 	}
@@ -185,14 +192,13 @@ int dual(int first, int last, int dPos){
 		dualServer[dPos+i].ratenum = primaryServer[first+i].rateden-primaryServer[first+i].ratenum;
 		number = 0;
 		for(j = 0 ; j < primaryServer[first+i].size ; j++){
-			for(k = 0 ; k < primaryServer[first+i].son[j]->number ; k++){
-				dualServer[dPos+i].periods[number+k] = primaryServer[first+i].son[j]->periods[k];
-				dualServer[dPos+i].deadlines[number+k] = primaryServer[first+i].son[j]->deadlines[k];
+			for(k = 0 ; k < dualServer[primaryServer[first+i].son[j]-1].number ; k++){
+				dualServer[dPos+i].periods[number+k] = dualServer[primaryServer[first+i].son[j]-1].periods[k];
 			}
 			number += k;
 		}
-		dualServer[dPos+i].son = &primaryServer[first+i];
-		primaryServer[first+i].father = &dualServer[dPos+i];
+		dualServer[dPos+i].son = first+i+31;
+		primaryServer[first+i].father = dPos+i+1;
 		dualServer[dPos+i].number = number;
 	}
 
@@ -208,10 +214,10 @@ int reduce(int first, int last, int pPos, int dPos){
 int printD(DS server){
 	int i;
 	printf("\nserver number %d of rate %d/%d. ", server.name, server.ratenum, server.rateden);
-	if(server.son->name == 0)
-		printf("it is a leaf, meaning 'a real task', its father is %d and its period is %d \n", server.father->name, server.periods[0]);
+	if(server.son == 0)
+		printf("it is a leaf, meaning 'a real task', its father is %d and its period is %d \n", primaryServer[server.father-1].name, server.periods[0]);
 	else{
-		printf("his son is the server number %d, and his father is the server number %d its periods are ", server.son->name, server.father->name);
+		printf("his son is the server number %d, and his father is the server number %d its periods are ", primaryServer[server.son-1].name, primaryServer[server.father-1].name);
 		for(i = 0 ; i < server.number ; i++)
 			printf("%d ", server.periods[i]);
 		printf("\n");
@@ -222,19 +228,29 @@ int printD(DS server){
 int printP(PS server){
 	int i;
 	printf("\nserver number %d of rate %d/%d. ", server.name, server.ratenum, server.rateden);
-	if(server.father->name == 0)
-		printf("it is a root, ");
+	if(server.father == 0)
+		printf("it is the root, ");
 	else
-		printf("his father is the server number %d, ", server.father->name);
+		printf("his father is the server number %d, ", dualServer[server.father-1].name);
 	printf("his sons are number ");
 	for(i = 0 ; i < server.size ; i++)
-		printf("%d ", server.son[i]->name);
+		printf("%d ", dualServer[server.son[i]-1].name);
 	printf("\n");
 	return 1;
 }
 
-int pgcd(int a, int b){
+int pgcd(int c, int d){
+	int a;
+	int b;
 	int r;
+	if(c>d){
+		a = c;
+		b = d;
+	}
+	else{
+		a = d;
+		b = c;
+	}
 	r= a % b; 
 	while(r!=0){
 		a = b; 
