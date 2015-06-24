@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-void *VCoreExec(void *i);
+void *VCoreExec(void *arg);
 void *TaskExec(void *i);
 void complete(int nbr);
 void insertion(int nbr);
@@ -17,6 +17,28 @@ int minDeadline(DS server);
 int TaskNbr;
 int virtualCoreNbr;
 int virtualCores[20];
+DS dualServer[30];
+PS primaryServer[30];
+
+pthread_cond_t  core_Var[20];
+pthread_cond_t  proc_Var[20];
+
+pthread_mutex_t  core_Lock[20];
+pthread_mutex_t  proc_Lock[20];
+
+int q = 1000000; // Length of a quantum in microseconds
+int texec = 0;
+
+typedef struct {
+  pthread_cond_t  Cond_Var;
+  pthread_mutex_t Lock;
+  pthread_t       Thread_Id;
+} Shared_Task;
+
+Shared_Task Shared_T;
+
+pthread_t vcThreads[20];
+pthread_t taskThreads[30];
 
 int main(int argc, char* argv[]){
 
@@ -32,9 +54,6 @@ int main(int argc, char* argv[]){
 	int Dlevels[20];
 	int Plevels[20];
 	int cores[20];
-
-	DS dualServer[30];
-	PS primaryServer[30];
 
 	/* Getting all datas from .off file */
 
@@ -106,13 +125,28 @@ int main(int argc, char* argv[]){
 		Plevels[2*i+1] = j-1;
 	}
 
-	primaryServer[nbP-1].active = true; //always active
+	primaryServer[nbP-1].active = true; //root is always active
 
-	for (i = 0 ; i<nbproc ; i++)
+	for (i = 0 ; i<nbproc ; i++){
 		cores[i] = -1;
+		pthread_cond_init(&proc_Var[i], NULL);
+ 		pthread_mutex_init(&proc_Lock[i], NULL);
+	}
 
 	for (i = 0 ; i<virtualCoreNbr ; i++)
 		virtualCores[i] = -1;
+		pthread_cond_init(&core_Var[i], NULL);
+ 		pthread_mutex_init(&core_Lock[i], NULL);
+	}
+
+	for (i = 0; i<virtualCoreNbr ; i++){
+		int *arg = malloc(sizeof(*arg));
+		*arg = i;
+		pthread_create(&vcThreads[i], NULL, VCoreExec, arg);
+		printf("vient d'etre cree (coeur virtuel) : (0x)%x\n", (int) vcThreads[i]);
+	}
+
+	sleep(2);
 
 	/* Assiociating real cores with virtual ones */
 
@@ -191,15 +225,11 @@ int minDeadline(DS server){
 
 void *TaskExec(void *i){
 
-  int nbr = *((int *) i);
+	int nbr = *((int *) i);
 
-  Tasks[nbr].active = 1;
+	/*
 
-  float w = Tasks[nbr].WCET;
-	printf("w%d = %f\n", nbr, w);
-  float q = 1000000;
-
-  insertion(nbr);
+	insertion(nbr);
 
 	while(true){
 
@@ -236,14 +266,12 @@ void *TaskExec(void *i){
     printf("texec = %d\n", texec);
 		pthread_mutex_unlock(&Shared_T.Lock);
 
-  }
-
-  //free(i);
+  }*/
 
 return 0;
 
 }
-
+/*
 void complete(int nbr){
 
   pthread_cond_broadcast(&Shared_T.Cond_Var);
@@ -263,12 +291,8 @@ void complete(int nbr){
 
 void insertion(int nbr){
 
-  int i=0;
+	int i=0;
 	int inserted = 0;
-
-  /*if (*lTasks == NULL || *Tasks[nbr]  == NULL){
-    exit(EXIT_FAILURE);
-  }*/
 
 	while(Tasks[i].next != 0){
 		if(Tasks[Tasks[i].next].deadline > Tasks[nbr].deadline){
@@ -293,71 +317,23 @@ void insertion(int nbr){
 		printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
 	}
 
-}
+}*/
 
-void *VCoreExec(void *i){
+void *VCoreExec(void *arg){
 
-  int i;
-  int nbr;
-  float wcet;
-  float period;
-  float totalrate = 0;
+	int i;
+	int nbr = *((int *) arg);
 
-  if (argc != 2){
-    printf("Usage : %s nombre-de-taches\n", argv[0]);
-    exit(1);
-  }
+	TSK Tasks[MAX_TASKS];
 
-  TaskNbr = atoi(argv[1]);
+	for (i = 0; i < primaryServer[nbr].size; i++){
+		pthread_create(&taskThreads[primaryServer[nbr].son[i]], NULL, TaskExec, &primaryServer[nbr].son[i]);
+		printf("vient d'etre cree (tache) : (0x)%x\n", (int) taskThreads[primaryServer[nbr].son[i]]);
+	}
 
-  printf("Quels sont le WCET et la periode pour chaque tache ?\n");
-
-  Tasks[0].number = 0;
-	Tasks[0].next = 0;
-
-  for (i = 1; i <= TaskNbr; i++){
-    nbr = scanf("%f %f", &wcet, &period);
-    if (nbr != 2){
-      printf("L'usage est WCET-tache periode-tache\n");
-    }
-
-    Tasks[i].number = i;
-    Tasks[i].period = period*1000000;
-    Tasks[i].deadline = period*1000000;
-    Tasks[i].WCET = wcet*1000000;
-    Tasks[i].complete = 0;
-		Tasks[i].next = 0;
-  }
-
-  for (i = 1; i <= TaskNbr; i++){
-    totalrate += (Tasks[i].WCET/Tasks[i].period)*100;
-  }
-
-  if (totalrate > 100){
-    printf("Le taux d'utilisation du CPU ne peut etre superieur a 100 pourcents\n");
-  }
-
-  pthread_t Threads[TaskNbr];
-
-  /* Initialisation des vars. partagees */
-
-  pthread_cond_init(&Shared_T.Cond_Var, NULL);
-  pthread_mutex_init(&Shared_T.Lock, NULL);
-
-  pthread_mutex_lock(&Shared_T.Lock);
-
-  for (i = 1; i <= TaskNbr; i++){
-    int *arg = malloc(sizeof(*arg));
-    *arg = i;
-    pthread_create(&Threads[i], NULL, TaskExec, arg);
-    printf("vient d'etre cree : (0x)%x\n", (int) Threads[i]);
-  }
-
-  sleep(1);
-
-  pthread_mutex_unlock(&Shared_T.Lock);
-
+	pthread_mutex_lock(&proc_Lock[nbr]);
 	sleep(1);
+	pthread_mutex_unlock(&proc_Lock[nbr]);
 
 	pthread_mutex_lock(&Shared_T.Lock);
 
@@ -376,4 +352,4 @@ void *VCoreExec(void *i){
 
 	return 0;
 
-}
+	}

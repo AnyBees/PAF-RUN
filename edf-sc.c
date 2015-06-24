@@ -44,7 +44,7 @@ int main (int argc, char *argv[]){
   printf("Quels sont le WCET et la periode pour chaque tache ?\n");
 
   Tasks[0].number = 0;
-	Tasks[0].next = 0;
+  Tasks[0].next = 0;
 
   for (i = 1; i <= TaskNbr; i++){
     nbr = scanf("%f %f", &wcet, &period);
