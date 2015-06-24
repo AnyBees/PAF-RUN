@@ -1,169 +1,169 @@
-Le systeme s'ordonnance sur 3 processeurs
+Le systeme s'ordonnance sur 3 processeurs. L'arbre est obtenu apres 3 iterations
 
 number of dual servers = 12
+
+begin D
+number = 0
+rate = 3/4
+number of periods = 1
+periods = 4 
+father = 0
+son = -1
+end D
 
 begin D
 number = 1
 rate = 3/4
 number of periods = 1
 periods = 4 
-father = 31
-son = 0
+father = 1
+son = -1
 end D
 
 begin D
 number = 2
-rate = 3/4
+rate = 2/8
 number of periods = 1
-periods = 4 
-father = 32
-son = 0
+periods = 8 
+father = 0
+son = -1
 end D
 
 begin D
 number = 3
-rate = 2/8
+rate = 4/8
 number of periods = 1
 periods = 8 
-father = 31
-son = 0
+father = 2
+son = -1
 end D
 
 begin D
 number = 4
-rate = 4/8
+rate = 4/10
 number of periods = 1
-periods = 8 
-father = 33
-son = 0
+periods = 10 
+father = 2
+son = -1
 end D
 
 begin D
 number = 5
-rate = 4/10
+rate = 6/20
 number of periods = 1
-periods = 10 
-father = 33
-son = 0
+periods = 20 
+father = 3
+son = -1
 end D
 
 begin D
 number = 6
-rate = 6/20
-number of periods = 1
-periods = 20 
-father = 34
+rate = 0/1
+number of periods = 2
+periods = 4 8 
+father = 4
 son = 0
 end D
 
 begin D
 number = 7
-rate = 0/1
-number of periods = 2
-periods = 4 8 
-father = 35
-son = 31
+rate = 1/4
+number of periods = 1
+periods = 4 
+father = 4
+son = 1
 end D
 
 begin D
 number = 8
-rate = 1/4
-number of periods = 1
-periods = 4 
-father = 35
-son = 32
+rate = 1/10
+number of periods = 2
+periods = 8 10 
+father = 4
+son = 2
 end D
 
 begin D
 number = 9
-rate = 1/10
-number of periods = 2
-periods = 8 10 
-father = 35
-son = 33
+rate = 14/20
+number of periods = 1
+periods = 20 
+father = 5
+son = 3
 end D
 
 begin D
 number = 10
-rate = 14/20
-number of periods = 1
-periods = 20 
-father = 36
-son = 34
+rate = 13/20
+number of periods = 5
+periods = 4 8 4 8 10 
+father = 6
+son = 4
 end D
 
 begin D
 number = 11
-rate = 13/20
-number of periods = 5
-periods = 4 8 4 8 10 
-father = 37
-son = 35
-end D
-
-begin D
-number = 12
 rate = 6/20
 number of periods = 1
 periods = 20 
-father = 37
-son = 36
+father = 6
+son = 5
 end D
 
 number of primary servers = 7
 
 begin P
-number = 31
+number = 0
 rate = 1/1
-father = 7
+father = 6
 number of sons = 2
-sons = 1 3 
+sons = 0 2 
 end P
 
 begin P
-number = 32
+number = 1
 rate = 3/4
-father = 8
+father = 7
 number of sons = 1
-sons = 2 
+sons = 1 
 end P
 
 begin P
-number = 33
+number = 2
 rate = 9/10
-father = 9
+father = 8
 number of sons = 2
-sons = 4 5 
+sons = 3 4 
 end P
 
 begin P
-number = 34
+number = 3
 rate = 6/20
-father = 10
+father = 9
 number of sons = 1
-sons = 6 
+sons = 5 
 end P
 
 begin P
-number = 35
+number = 4
 rate = 7/20
-father = 11
+father = 10
 number of sons = 3
-sons = 7 8 9 
+sons = 6 7 8 
 end P
 
 begin P
-number = 36
+number = 5
 rate = 14/20
-father = 12
+father = 11
 number of sons = 1
-sons = 10 
+sons = 9 
 end P
 
 begin P
-number = 37
+number = 6
 rate = 19/20
-father = 0
+father = -1
 number of sons = 2
-sons = 11 12 
+sons = 10 11 
 end P

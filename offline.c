@@ -28,6 +28,7 @@ int main(int argc, char* argv[]){
 	int tauxTotalDen = 1;
 	int sub;
 	int nbproc;
+	int levels;
 	char out[80];
 
 	/* Input des tasks */
@@ -57,12 +58,12 @@ int main(int argc, char* argv[]){
 			printf("Worst case execution time must be lower than period\n");
 			return 1;
 		}
-		dualServer[i].name = i+1;
+		dualServer[i].name = i;
 		dualServer[i].ratenum = wcet;
 		dualServer[i].rateden = period;
 		dualServer[i].number = 1;
 		dualServer[i].periods[0] = period;
-		dualServer[i].son = 0;
+		dualServer[i].son = -1;
 		if(res == 2){
 			tauxTotalNum = tauxTotalNum*period+tauxTotalDen*wcet;
 			tauxTotalDen = tauxTotalDen*period;
@@ -88,13 +89,16 @@ int main(int argc, char* argv[]){
 	pCreates = pack(0, dPos, pPos);
 	pPos += pCreates;
 
+	levels = 1;
+
 	while(pCreates > 1){
 		dPos += pCreates;
 		pCreates = reduce(pPos-pCreates, pPos, pPos, dPos-pCreates);
-		pPos += pCreates;		
+		pPos += pCreates;
+		levels ++;	
 	}
 
-	primaryServer[pPos-1].father = 0;
+	primaryServer[pPos-1].father = -1;
 
 	fp = fopen (strcat(out,".off"), "w");
 
@@ -103,7 +107,7 @@ int main(int argc, char* argv[]){
 	else
 		nbproc = tauxTotalNum/tauxTotalDen + 1;
 
-	fprintf(fp, "Le systeme s'ordonnance sur %d processeurs\n\n", nbproc);
+	fprintf(fp, "Le systeme s'ordonnance sur %d processeurs. L'arbre est obtenu apres %d iterations\n\n", nbproc, levels);
 
 	fprintf(fp, "number of dual servers = %d\n", dPos);
 
@@ -140,12 +144,12 @@ int pack(int first, int last, int pPos){
 	/* Initialisation of first DS in a PS */
 
 	int serverNumber = 1;
-	primaryServer[pPos].name = 31+pPos;
+	primaryServer[pPos].name = pPos;
 	primaryServer[pPos].ratenum = dualServer[first].ratenum;
 	primaryServer[pPos].rateden = dualServer[first].rateden;
 	primaryServer[pPos].size = 1;
-	primaryServer[pPos].son[0] = first+1;
-	dualServer[first].father = pPos+31;
+	primaryServer[pPos].son[0] = first;
+	dualServer[first].father = pPos;
 
 	/* we use first-fit to put the DS in the PS */
 
@@ -158,20 +162,20 @@ int pack(int first, int last, int pPos){
 				sub = pgcd(primaryServer[j].rateden, primaryServer[j].ratenum);
 				primaryServer[j].rateden = primaryServer[j].rateden/sub;
 				primaryServer[j].ratenum = primaryServer[j].ratenum/sub;
-				primaryServer[j].son[primaryServer[j].size] = i+1;
+				primaryServer[j].son[primaryServer[j].size] = i;
 				primaryServer[j].size++;
-				dualServer[i].father = j+31;
+				dualServer[i].father = j;
 				place = 1;
 				break;
 			}
 		}
 		if(!place){
-			primaryServer[pPos+serverNumber].name = 31+pPos+serverNumber;
+			primaryServer[pPos+serverNumber].name = pPos+serverNumber;
 			primaryServer[pPos+serverNumber].ratenum = dualServer[i].ratenum;
 			primaryServer[pPos+serverNumber].rateden = dualServer[i].rateden;
 			primaryServer[pPos+serverNumber].size = 1;
-			primaryServer[pPos+serverNumber].son[0] = i+1;
-			dualServer[i].father = pPos+serverNumber+31;
+			primaryServer[pPos+serverNumber].son[0] = i;
+			dualServer[i].father = pPos+serverNumber;
 			serverNumber++;
 		}
 	}
@@ -187,18 +191,18 @@ int dual(int first, int last, int dPos){
 	int number;
 
 	for(i = 0 ; i < last-first ; i++){
-		dualServer[dPos+i].name = dPos+i+1;
+		dualServer[dPos+i].name = dPos+i;
 		dualServer[dPos+i].rateden = primaryServer[first+i].rateden;
 		dualServer[dPos+i].ratenum = primaryServer[first+i].rateden-primaryServer[first+i].ratenum;
 		number = 0;
 		for(j = 0 ; j < primaryServer[first+i].size ; j++){
-			for(k = 0 ; k < dualServer[primaryServer[first+i].son[j]-1].number ; k++){
-				dualServer[dPos+i].periods[number+k] = dualServer[primaryServer[first+i].son[j]-1].periods[k];
+			for(k = 0 ; k < dualServer[primaryServer[first+i].son[j]].number ; k++){
+				dualServer[dPos+i].periods[number+k] = dualServer[primaryServer[first+i].son[j]].periods[k];
 			}
 			number += k;
 		}
-		dualServer[dPos+i].son = first+i+31;
-		primaryServer[first+i].father = dPos+i+1;
+		dualServer[dPos+i].son = first+i;
+		primaryServer[first+i].father = dPos+i;
 		dualServer[dPos+i].number = number;
 	}
 
@@ -214,10 +218,10 @@ int reduce(int first, int last, int pPos, int dPos){
 int printD(DS server){
 	int i;
 	printf("\nserver number %d of rate %d/%d. ", server.name, server.ratenum, server.rateden);
-	if(server.son == 0)
-		printf("it is a leaf, meaning 'a real task', its father is %d and its period is %d \n", primaryServer[server.father-1].name, server.periods[0]);
+	if(server.son == -1)
+		printf("it is a leaf, meaning 'a real task', its father is %d and its period is %d \n", server.father, server.periods[0]);
 	else{
-		printf("his son is the server number %d, and his father is the server number %d its periods are ", primaryServer[server.son-1].name, primaryServer[server.father-1].name);
+		printf("his son is the server number %d, and his father is the server number %d its periods are ", server.son, server.father);
 		for(i = 0 ; i < server.number ; i++)
 			printf("%d ", server.periods[i]);
 		printf("\n");
@@ -228,13 +232,13 @@ int printD(DS server){
 int printP(PS server){
 	int i;
 	printf("\nserver number %d of rate %d/%d. ", server.name, server.ratenum, server.rateden);
-	if(server.father == 0)
+	if(server.father == -1)
 		printf("it is the root, ");
 	else
-		printf("his father is the server number %d, ", dualServer[server.father-1].name);
+		printf("his father is the server number %d, ", server.father);
 	printf("his sons are number ");
 	for(i = 0 ; i < server.size ; i++)
-		printf("%d ", dualServer[server.son[i]-1].name);
+		printf("%d ", server.son[i]);
 	printf("\n");
 	return 1;
 }

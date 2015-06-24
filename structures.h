@@ -13,6 +13,7 @@ struct PS			// Primary server
 	int size;		// number of sons to look for EDF
 	int son[10];	        // Pointers to the sons of tree
 	int father;		//useful to recover the deadlines to hight level DS of the tree
+	_Bool active;
 };
 
 struct DS			// dual server
@@ -25,6 +26,7 @@ struct DS			// dual server
 	int deadlines[30];	// Next deadline associate with each periods
 	int son;		// The only son in the tree ( the name 0 if is a task)
 	int father;		// useful to recover the deadlines to hight level DS of the tree
+	_Bool active;
 };
 
 struct TSK {
