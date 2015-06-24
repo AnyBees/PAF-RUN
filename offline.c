@@ -255,6 +255,8 @@ int pgcd(int c, int d){
 		a = d;
 		b = c;
 	}
+	if(b==0)
+		return a;
 	r= a % b; 
 	while(r!=0){
 		a = b; 

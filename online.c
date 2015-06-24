@@ -8,13 +8,17 @@
 #include <stdbool.h>
 #include <string.h>
 
+#define MAX_INT 2147483647
+
 void *VCoreExec(void *arg);
-void *TaskExec(void *i);
+void *TaskExec(void *arg);
 void complete(int nbr);
 void insertion(int nbr);
 int minDeadline(DS server);
 
 int TaskNbr;
+int nbproc;
+int levels;
 int virtualCoreNbr;
 int virtualCores[20];
 DS dualServer[30];
@@ -26,8 +30,10 @@ pthread_cond_t  proc_Var[20];
 pthread_mutex_t  core_Lock[20];
 pthread_mutex_t  proc_Lock[20];
 
+TSK Tasks[60];
+
 int q = 1000000; // Length of a quantum in microseconds
-int texec = 0;
+int texec;
 
 typedef struct {
   pthread_cond_t  Cond_Var;
@@ -47,10 +53,8 @@ int main(int argc, char* argv[]){
 	int k;
 	int num;
 	int min;
-	int nbproc;
 	int nbD;
 	int nbP;
-	int levels;
 	int Dlevels[20];
 	int Plevels[20];
 	int cores[20];
@@ -125,90 +129,84 @@ int main(int argc, char* argv[]){
 		Plevels[2*i+1] = j-1;
 	}
 
-	primaryServer[nbP-1].active = true; //root is always active
-
 	for (i = 0 ; i<nbproc ; i++){
 		cores[i] = -1;
 		pthread_cond_init(&proc_Var[i], NULL);
  		pthread_mutex_init(&proc_Lock[i], NULL);
 	}
 
-	for (i = 0 ; i<virtualCoreNbr ; i++)
-		virtualCores[i] = -1;
-		pthread_cond_init(&core_Var[i], NULL);
- 		pthread_mutex_init(&core_Lock[i], NULL);
-	}
-
 	for (i = 0; i<virtualCoreNbr ; i++){
 		int *arg = malloc(sizeof(*arg));
 		*arg = i;
+		virtualCores[i] = -1;
 		pthread_create(&vcThreads[i], NULL, VCoreExec, arg);
 		printf("vient d'etre cree (coeur virtuel) : (0x)%x\n", (int) vcThreads[i]);
 	}
 
-	sleep(2);
+	primaryServer[nbP-1].active = true; // root is always active
 
-	/* Assiociating real cores with virtual ones */
+	int texec = -q;
 
-	for(i = 0 ; i<nbD ; i++)
-		dualServer[i].active = false;
+	/* Associating real cores with virtual ones */
 
-	for(i = 0 ; i<nbP-1 ; i++)
-		dualServer[i].active = false;
+	while(true){
 
-	for(i = levels-1 ; i>0 ; i--){
-		for (j = Plevels[2*i] ; j < Plevels[2*i+1]+1 ; j++){
-			if(primaryServer[j].active){
-				num = primaryServer[j].son[0];
-				min = minDeadline(dualServer[primaryServer[j].son[0]]);
-				for (k = 1 ; k < primaryServer[j].size ; k++){
-					if(minDeadline(dualServer[primaryServer[j].son[k]]) < min)
-						num = primaryServer[j].son[k];
-						min = minDeadline(dualServer[primaryServer[j].son[k]]);
+		texec += q;
+		printf("loop\n");
+
+		for(i = 0 ; i<nbD ; i++)
+			dualServer[i].active = false;
+
+		for(i = 0 ; i<nbP-1 ; i++)
+			dualServer[i].active = false;
+
+		for(i = levels-1 ; i>0 ; i--){
+			for (j = Plevels[2*i] ; j < Plevels[2*i+1]+1 ; j++){
+				if(primaryServer[j].active){
+					num = -1;
+					min = MAX_INT;
+					for (k = 0 ; k < primaryServer[j].size ; k++){
+						if(minDeadline(dualServer[primaryServer[j].son[k]]) < min && dualServer[primaryServer[j].son[k]].ratenum != 0){
+							num = primaryServer[j].son[k];
+							min = minDeadline(dualServer[primaryServer[j].son[k]]);
+						}
+					}
+					if(num != -1)
+						dualServer[num].active = true;
 				}
-				dualServer[num].active = true;
+			}
+			for (j = Plevels[2*(i-1)] ; j < Plevels[2*i-1]+1 ; j++){
+				if (!dualServer[primaryServer[j].father].active)
+					primaryServer[j].active = true;
 			}
 		}
-		for (j = Plevels[2*(i-1)] ; j < Plevels[2*i-1]+1 ; j++){
-			if (!dualServer[primaryServer[j].father].active)
-				primaryServer[j].active = true;
-		}
-	}
 
-	for(i = 0 ; i<nbD ; i++){
-		if(dualServer[i].active)
-			printf("%d ", i);
-	}
-	printf("duaux activés \n");	
-
-	for(i = 0 ; i<nbP ; i++){
-		if(primaryServer[i].active)
-			printf("%d ", i);
-	}
-	printf("primaires activés \n");
-
-	for(i = 0 ; i<virtualCoreNbr ; i++){
-		if(primaryServer[i].active){
-			if(virtualCores[i] == -1){
-				for (j = 0 ; j<nbproc ; j++){
-					if(!primaryServer[cores[j]].active){
-						virtualCores[cores[j]] = -1;
-						cores[j] = i;
-						virtualCores[i] = j;
-						break;
+		for(i = 0 ; i<virtualCoreNbr ; i++){
+			if(primaryServer[i].active){
+				if(virtualCores[i] == -1){
+					for (j = 0 ; j<nbproc ; j++){
+						if(!(primaryServer[cores[j]].active)){
+							virtualCores[cores[j]] = -1;
+							cores[j] = i;
+							virtualCores[i] = j;
+							break;
+						}
 					}
 				}
 			}
 		}
+
+		for(i = 0 ; i<virtualCoreNbr ; i++){
+			if(primaryServer[i].active){
+				pthread_cond_broadcast(&proc_Var[i]);
+				printf("%d activé sur coeur %d\n", i, virtualCores[i]);
+				//usleep(2*q);
+				
+			}
+		}
+				
+	usleep(2*nbproc*q);
 	}
-
-	for(i = 0 ; i<virtualCoreNbr ; i++)
-		printf("%d ", virtualCores[i]);
-	printf("pour les cv\n");
-
-	for(i = 0 ; i<nbproc ; i++)
-		printf("%d ", cores[i]);
-	printf("pour les coeurs\n");
 
 	return 0;
 }
@@ -223,11 +221,20 @@ int minDeadline(DS server){
 	return min;
 }
 
-void *TaskExec(void *i){
+void *TaskExec(void *arg){
 
-	int nbr = *((int *) i);
+	int nbr = *((int *) arg);
 
-	/*
+	int virtual = dualServer[nbr].father;
+	DS server = dualServer[nbr];
+	int i;
+	int j;
+
+	int w = dualServer[nbr].ratenum*q;
+
+	Tasks[nbr].next = virtual;
+	Tasks[nbr].previous = virtual;
+	Tasks[nbr].active = true;
 
 	insertion(nbr);
 
@@ -235,66 +242,91 @@ void *TaskExec(void *i){
 
 		while(w >= q && Tasks[nbr].active){
 
-			pthread_mutex_lock(&Shared_T.Lock);
+			pthread_mutex_lock(&proc_Lock[virtual]);
 
-			while(Tasks[0].next != nbr){
+			while(Tasks[virtual+30].next != nbr){
 				printf("Tâche %d en attente de passer prioritaire\n", nbr);
-				pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
+				pthread_cond_wait(&proc_Var[virtual],&proc_Lock[virtual]);
 			}
 
-		  usleep(q);
-			printf("Tache %d a consomme un quantum\n", nbr);
-		  w -= q;
+		usleep(q*nbproc);
+		printf("Tache %d a consomme un quantum dans le coeur %d, %d\n", nbr, virtualCores[virtual], virtual);
+		w -= q;
+		pthread_cond_wait(&proc_Var[virtual],&proc_Lock[virtual]);
+		pthread_mutex_unlock(&proc_Lock[virtual]);
+		usleep(1000);
+	}
 
-		  texec += q;
-			pthread_mutex_unlock(&Shared_T.Lock);
-			usleep(1000);
-		}
+	complete(nbr);
 
-	  complete(nbr);
+	printf("Sleep %f\n",(Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
 
-		printf("Sleep %f\n",(Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
+	usleep((Tasks[nbr].complete)*(dualServer[nbr].periods[0])-texec);
 
-		usleep((Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
-
-	  pthread_mutex_lock(&Shared_T.Lock);
+	pthread_mutex_lock(&proc_Lock[virtual]);
     insertion(nbr);
     Tasks[nbr].active = 1;
-		w = Tasks[nbr].WCET;
-		printf("Tache %d va se reactiver\n", nbr);
+	for (i=1 ; i<levels ; i++){
+		server = dualServer[primaryServer[server.father].father];
+		for (j=0 ; j < server.number ; j++){
+			if(server.deadlines[j] == MAX_INT){
+				server.deadlines[j] = dualServer[nbr].deadlines[0];
+				break;
+			}
+		}
+	}
+	w = dualServer[nbr].ratenum*q;
+	printf("Tache %d va se reactiver\n", nbr);
 
     printf("texec = %d\n", texec);
-		pthread_mutex_unlock(&Shared_T.Lock);
+	pthread_mutex_unlock(&proc_Lock[virtual]);
 
-  }*/
+}
 
 return 0;
 
 }
-/*
+
 void complete(int nbr){
 
-  pthread_cond_broadcast(&Shared_T.Cond_Var);
+	int i;
+	int j;
+	int virtual = dualServer[nbr].father;
+	DS server = dualServer[nbr];
 
-  Tasks[nbr].deadline += Tasks[nbr].period;
+	pthread_cond_broadcast(&proc_Var[virtual]);
 
-  Tasks[nbr].complete++;
-  Tasks[nbr].active = 0;
+	for (i=1 ; i<levels ; i++){
+		server = dualServer[primaryServer[server.father].father];
+		for (j=0 ; j < server.number ; j++){
+			if(server.deadlines[j] == dualServer[nbr].deadlines[0]){
+				server.deadlines[j] = MAX_INT;
+				break;
+			}
+		}
+	}
+
+	dualServer[nbr].deadlines[0] += dualServer[nbr].periods[0];
+
+	Tasks[nbr].complete++;
+	Tasks[nbr].active = 0;
 	Tasks[Tasks[nbr].previous].next = Tasks[nbr].next;
 	Tasks[Tasks[nbr].next].previous = Tasks[nbr].previous;
-	Tasks[nbr].next = 0;
-	Tasks[nbr].previous = 0;
+	Tasks[nbr].next = virtual;
+	Tasks[nbr].previous = virtual;
 
-  printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete);
+	printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete);
 
 }
 
 void insertion(int nbr){
 
-	int i=0;
 	int inserted = 0;
 
-	while(Tasks[i].next != 0){
+	int virtual = dualServer[nbr].father+30;
+	int i=virtual;
+
+	while(Tasks[i].next != virtual){
 		if(Tasks[Tasks[i].next].deadline > Tasks[nbr].deadline){
 			Tasks[nbr].next = Tasks[i].next;
 			Tasks[i].next = nbr;
@@ -311,43 +343,52 @@ void insertion(int nbr){
 	if (!inserted){
 
 		Tasks[nbr].previous = i;
-		Tasks[nbr].next = 0;
-    Tasks[i].next = nbr;
+		Tasks[nbr].next = virtual;
+    	Tasks[i].next = nbr;
 
 		printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
 	}
 
-}*/
+}
 
 void *VCoreExec(void *arg){
 
 	int i;
 	int nbr = *((int *) arg);
 
-	TSK Tasks[MAX_TASKS];
+	pthread_mutex_lock(&proc_Lock[nbr]);
+	Tasks[nbr+30].next = nbr+30;
+
+	usleep(1000);
+
+	while(virtualCores[nbr] == -1){
+		printf("waiting %d coeur %d\n", nbr, virtualCores[nbr]);
+		pthread_cond_wait(&proc_Var[nbr],&proc_Lock[nbr]);
+	}
+	printf("passe %d coeur %d\n", nbr, virtualCores[nbr]);
 
 	for (i = 0; i < primaryServer[nbr].size; i++){
 		pthread_create(&taskThreads[primaryServer[nbr].son[i]], NULL, TaskExec, &primaryServer[nbr].son[i]);
 		printf("vient d'etre cree (tache) : (0x)%x\n", (int) taskThreads[primaryServer[nbr].son[i]]);
 	}
 
-	pthread_mutex_lock(&proc_Lock[nbr]);
-	sleep(1);
+	usleep(1000*nbproc);
+
 	pthread_mutex_unlock(&proc_Lock[nbr]);
 
-	pthread_mutex_lock(&Shared_T.Lock);
+	usleep(1000*nbproc);
 
-	while(true){	
-		while(Tasks[0].next != 0){
-			pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
+	while(true){
+		pthread_mutex_lock(&proc_Lock[nbr]);	
+		while(Tasks[nbr+30].next != nbr+30){
+			pthread_cond_wait(&proc_Var[nbr],&proc_Lock[nbr]);
 		}
 
-		usleep(1000000);
-		printf("Processor is idle\n");
+		usleep(q*nbproc);
+		printf("Core %d is idle %d\n", virtualCores[nbr], nbr);
 
-		texec += 1000000;
-		pthread_mutex_unlock(&Shared_T.Lock);
-		usleep(1000);
+		pthread_mutex_unlock(&proc_Lock[nbr]);
+		usleep(nbproc*1000);
 	}
 
 	return 0;

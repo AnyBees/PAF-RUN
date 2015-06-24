@@ -1,0 +1,74 @@
+Le systeme s'ordonnance sur 2 processeurs. L'arbre est obtenu apres 2 iterations
+
+number of dual servers = 5
+
+begin D
+number = 0
+rate = 2/4
+number of periods = 1
+periods = 4 
+father = 0
+son = -1
+end D
+
+begin D
+number = 1
+rate = 2/4
+number of periods = 1
+periods = 4 
+father = 0
+son = -1
+end D
+
+begin D
+number = 2
+rate = 5/5
+number of periods = 1
+periods = 5 
+father = 1
+son = -1
+end D
+
+begin D
+number = 3
+rate = 0/1
+number of periods = 2
+periods = 4 4 
+father = 2
+son = 0
+end D
+
+begin D
+number = 4
+rate = 0/5
+number of periods = 1
+periods = 5 
+father = 2
+son = 1
+end D
+
+number of primary servers = 3
+
+begin P
+number = 0
+rate = 1/1
+father = 3
+number of sons = 2
+sons = 0 1 
+end P
+
+begin P
+number = 1
+rate = 5/5
+father = 4
+number of sons = 1
+sons = 2 
+end P
+
+begin P
+number = 2
+rate = 0/1
+father = -1
+number of sons = 2
+sons = 3 4 
+end P
