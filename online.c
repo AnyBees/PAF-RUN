@@ -291,6 +291,7 @@ void *TaskExec(void *arg){
 		w = dualServer[nbr].ratenum*q;
 
 		pthread_mutex_unlock(&proc_Lock[virtual]);
+		usleep(1000);
 
 	}
 
@@ -393,6 +394,9 @@ void *VCoreExec(void *arg){
 		pthread_mutex_lock(&proc_Lock[nbr]);	
 		while(Tasks[nbr+30].next != nbr+30){
 			pthread_cond_wait(&proc_Var[nbr],&proc_Lock[nbr]);
+			pthread_mutex_unlock(&proc_Lock[nbr]);	
+			usleep(nbproc*1000);
+			pthread_mutex_lock(&proc_Lock[nbr]);
 		}
 
 		usleep(q*nbproc);
