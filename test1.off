@@ -4,54 +4,54 @@ number of dual servers = 10
 
 begin D
 number = 0
-rate = 3/4
+rate = 30/40
 number of periods = 1
-periods = 4 
+periods = 40 
 father = 0
 son = -1
 end D
 
 begin D
 number = 1
-rate = 3/4
+rate = 30/40
 number of periods = 1
-periods = 4 
+periods = 40 
 father = 1
 son = -1
 end D
 
 begin D
 number = 2
-rate = 2/8
+rate = 20/80
 number of periods = 1
-periods = 8 
+periods = 80 
 father = 0
 son = -1
 end D
 
 begin D
 number = 3
-rate = 4/8
+rate = 40/80
 number of periods = 1
-periods = 8 
+periods = 80 
 father = 2
 son = -1
 end D
 
 begin D
 number = 4
-rate = 4/10
+rate = 40/100
 number of periods = 1
-periods = 10 
+periods = 100 
 father = 2
 son = -1
 end D
 
 begin D
 number = 5
-rate = 7/20
+rate = 70/200
 number of periods = 1
-periods = 20 
+periods = 200 
 father = 3
 son = -1
 end D
@@ -59,8 +59,8 @@ end D
 begin D
 number = 6
 rate = 0/1
-number of periods = 2
-periods = 4 8 
+number of periods = 1
+periods = 40 
 father = 4
 son = 0
 end D
@@ -69,7 +69,7 @@ begin D
 number = 7
 rate = 1/4
 number of periods = 1
-periods = 4 
+periods = 40 
 father = 4
 son = 1
 end D
@@ -78,7 +78,7 @@ begin D
 number = 8
 rate = 1/10
 number of periods = 2
-periods = 8 10 
+periods = 80 100 
 father = 4
 son = 2
 end D
@@ -87,7 +87,7 @@ begin D
 number = 9
 rate = 13/20
 number of periods = 1
-periods = 20 
+periods = 200 
 father = 4
 son = 3
 end D

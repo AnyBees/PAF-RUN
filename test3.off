@@ -32,8 +32,8 @@ end D
 begin D
 number = 3
 rate = 0/1
-number of periods = 2
-periods = 4 4 
+number of periods = 1
+periods = 4 
 father = 2
 son = 0
 end D

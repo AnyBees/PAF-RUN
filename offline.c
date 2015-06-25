@@ -11,7 +11,7 @@ int dual(int first, int last, int dPos);	// Creat the dual of each primary serve
 int reduce(int first, int last, int pPos, int dPos);  // Just applying dual between first and last-1 and packing the resulting dual servers.  Returns the number of primary servers that were created in this step
 int printD(DS server);	// To display datas in the console
 int printP(PS server);
-int pgcd(int a, int b);
+int gcd(int a, int b);
 
 int main(int argc, char* argv[]){
 
@@ -29,6 +29,7 @@ int main(int argc, char* argv[]){
 	int sub;
 	int nbproc;
 	int levels;
+	int relevant;
 	char out[80];
 
 	/* Getting tasks from input file */
@@ -67,7 +68,7 @@ int main(int argc, char* argv[]){
 		if(res == 2){
 			tauxTotalNum = tauxTotalNum*period+tauxTotalDen*wcet;
 			tauxTotalDen = tauxTotalDen*period;
-			sub = pgcd(tauxTotalDen, tauxTotalNum);
+			sub = gcd(tauxTotalDen, tauxTotalNum);
 			tauxTotalNum = tauxTotalNum/sub;
 			tauxTotalDen = tauxTotalDen/sub;
 		}
@@ -94,6 +95,31 @@ int main(int argc, char* argv[]){
 	}
 
 	primaryServer[pPos-1].father = -1; // this server is the root
+
+	/* Multiplicating periods to keep integers in online part */
+
+	sub = 1;
+	
+	for(i = number ; i<dPos ; i++){
+		relevant = 0;
+		for(j = 0 ; j<dualServer[i].number ; j++){
+			if(dualServer[i].periods[j] % dualServer[i].rateden != 0){
+				relevant = 1;
+				break;
+			}
+		}
+		if(relevant)
+			sub = sub*dualServer[i].rateden/gcd(sub,dualServer[i].rateden);
+	}
+
+	for(i = 0 ; i<dPos ; i++){
+		for(j = 0 ; j<dualServer[i].number ; j++)
+			dualServer[i].periods[j] = dualServer[i].periods[j]*sub;
+		if(i < number){
+			dualServer[i].ratenum = dualServer[i].ratenum*sub;
+			dualServer[i].rateden = dualServer[i].rateden*sub;
+		}
+	}
 
 	/* Writing datas to a file that can be read by the online part */
 
@@ -123,10 +149,12 @@ int main(int argc, char* argv[]){
 		for(j = 0 ; j<primaryServer[i].size ; j++)
 			fprintf(fp, "%d ", primaryServer[i].son[j]);
 		fprintf(fp, "\nend P\n");
-		printP(primaryServer[i]);			
+		printP(primaryServer[i]);	
 	}
 
 	fclose(fp);
+
+	printf("On a multiplié l'échelle des temps par %d\n", sub);
 	
 	return 0;
 
@@ -157,7 +185,7 @@ int pack(int first, int last, int pPos){
 				// As the rate is a fraction, the condition and calculus of the new rate are a little bit complicated
 				primaryServer[j].ratenum = primaryServer[j].ratenum*dualServer[i].rateden + dualServer[i].ratenum*primaryServer[j].rateden;
 				primaryServer[j].rateden = primaryServer[j].rateden*dualServer[i].rateden;
-				sub = pgcd(primaryServer[j].rateden, primaryServer[j].ratenum); // simplificating rate to avoid to big integers
+				sub = gcd(primaryServer[j].rateden, primaryServer[j].ratenum); // simplificating rate to avoid to big integers
 				primaryServer[j].rateden = primaryServer[j].rateden/sub;
 				primaryServer[j].ratenum = primaryServer[j].ratenum/sub;
 				primaryServer[j].son[primaryServer[j].size] = i;
@@ -186,18 +214,28 @@ int dual(int first, int last, int dPos){
 	int i;
 	int j;
 	int k;
+	int l;
 	int number;
 
 	for(i = 0 ; i < last-first ; i++){
 		dualServer[dPos+i].name = dPos+i;
 		dualServer[dPos+i].rateden = primaryServer[first+i].rateden;
 		dualServer[dPos+i].ratenum = primaryServer[first+i].rateden-primaryServer[first+i].ratenum;
-		number = 0;
-		for(j = 0 ; j < primaryServer[first+i].size ; j++){ // loop to get all the periods from the subtree
-			for(k = 0 ; k < dualServer[primaryServer[first+i].son[j]].number ; k++){
-				dualServer[dPos+i].periods[number+k] = dualServer[primaryServer[first+i].son[j]].periods[k];
+		number = 1;
+		dualServer[dPos+i].periods[0] = dualServer[primaryServer[first+i].son[0]].periods[0];
+		for(j = 0 ; j < primaryServer[first+i].size ; j++){ // loop to get all the grandsons
+			for(k = 0 ; k < dualServer[primaryServer[first+i].son[j]].number ; k++){ // get all their periods
+				for(l = 0 ; l < number ; l++){ // comparing to already got periods to check if it is relevant to add
+					if(dualServer[primaryServer[first+i].son[j]].periods[k] % dualServer[dPos+i].periods[l] == 0)
+						break;
+					if(dualServer[dPos+i].periods[l] % dualServer[primaryServer[first+i].son[j]].periods[k] == 0){
+						dualServer[dPos+i].periods[l] = dualServer[primaryServer[first+i].son[j]].periods[k];
+						break;
+					}
+					dualServer[dPos+i].periods[number] = dualServer[primaryServer[first+i].son[j]].periods[k];
+					number++;
+				}				
 			}
-			number += k;
 		}
 		dualServer[dPos+i].son = first+i;
 		primaryServer[first+i].father = dPos+i;
@@ -241,7 +279,7 @@ int printP(PS server){
 	return 1;
 }
 /* find the greatest common divisor*/ 
-int pgcd(int c, int d){
+int gcd(int c, int d){
 	int a;
 	int b;
 	int r;
