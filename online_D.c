@@ -85,9 +85,10 @@ int main(int argc, char* argv[]){
 
 	for(i = 0 ; i<nbD ; i++){
 		fscanf(fp, "\nbegin D\nnumber = %d\nrate = %d/%d\nnumber of periods = %d\nperiods = ", &dualServer[i].name, &dualServer[i].ratenum, &dualServer[i].rateden, &dualServer[i].number);
-		for(j = 0 ; j<dualServer[i].number ; j++)
+		for(j = 0 ; j<dualServer[i].number ; j++){
 			fscanf(fp, "%d ", &dualServer[i].periods[j]);
 			dualServer[i].deadlines[j] = dualServer[i].periods[j];
+		}
 		fscanf(fp, "\nfather = %d\nson = %d\nend D\n", &dualServer[i].father, &dualServer[i].son);
 		dualServer[i].active = false;
 		if(dualServer[i].son == -1)
@@ -203,7 +204,7 @@ int main(int argc, char* argv[]){
 			if(primaryServer[i].active){
 				pthread_cond_broadcast(&proc_Var[i]);
 				printf("%d activé sur coeur %d\n", i, virtualCores[i]);
-				usleep(2*q);
+				//usleep(2*q);
 				
 			}
 		}
@@ -217,9 +218,13 @@ int main(int argc, char* argv[]){
 int minDeadline(DS server){
 	int i;
 	int min = server.deadlines[0];
+	printf("min est %d\n", min);
 	for (i = 1 ; i<server.number ; i++){
-		if(server.deadlines[i] < min)
+		printf("je suis dans la boucle for");
+		if(server.deadlines[i] < min){
 			min = server.deadlines[i];
+			printf("min est %d\n", min);
+			}
 	}
 	return min;
 }
