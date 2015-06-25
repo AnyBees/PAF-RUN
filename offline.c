@@ -6,10 +6,10 @@
 DS dualServer[30];
 PS primaryServer[30];
 
-int pack(int first, int last, int pPos);	//  Groups the duals servers in dualServer[first ... last-1] and appends the created primary servers in primaryservers beginning at range pPos
-int dual(int first, int last, int dPos);	// Creat the dual of each primary server in primaryServer[first ... last-1] and appends the created dual servers in primaryservers beginning at range dPos
-int reduce(int first, int last, int pPos, int dPos);
-int printD(DS server);
+int pack(int first, int last, int pPos);	//  Groups the duals servers in dualServer[first ... last-1] and appends the created primary servers in primaryservers beginning at range pPos. Returns the number of primary servers that were created in this step
+int dual(int first, int last, int dPos);	// Creat the dual of each primary server in primaryServer[first ... last-1] and appends the created dual servers in primaryservers beginning at range dPos. Returns the number of dual servers that were created in this step
+int reduce(int first, int last, int pPos, int dPos);  // Just applying dual between first and last-1 and packing the resulting dual servers.  Returns the number of primary servers that were created in this step
+int printD(DS server);	// To display datas in the console
 int printP(PS server);
 int pgcd(int a, int b);
 
@@ -31,7 +31,7 @@ int main(int argc, char* argv[]){
 	int levels;
 	char out[80];
 
-	/* Input des tasks */
+	/* Getting tasks from input file */
 
 	if (argc != 2) {
 		printf("You must give the input file %s\n", argv[0]);
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]){
 	i = 0;
 	res = 2;
 
-	while(res == 2){		
+	while(res == 2){  // res != 2 when the end of file is reached	
 		res = fscanf(fp, "%d %d", &period, &wcet);
 		if(wcet > period){
 			printf("Worst case execution time must be lower than period\n");
@@ -60,10 +60,10 @@ int main(int argc, char* argv[]){
 		}
 		dualServer[i].name = i;
 		dualServer[i].ratenum = wcet;
-		dualServer[i].rateden = period;
+		dualServer[i].rateden = period; // rate = wcet/period
 		dualServer[i].number = 1;
 		dualServer[i].periods[0] = period;
-		dualServer[i].son = -1;
+		dualServer[i].son = -1; // This server is a task, so a leaf
 		if(res == 2){
 			tauxTotalNum = tauxTotalNum*period+tauxTotalDen*wcet;
 			tauxTotalDen = tauxTotalDen*period;
@@ -74,31 +74,28 @@ int main(int argc, char* argv[]){
 		i++;
 	}
 
-	number = i-1;
+	number = i-1; // Getting the number of tasks from the number of iterations of the loop
 
 	fclose(fp);
-
-	/*if (totalRate % 100 != 0){
-		printf("The total use rate isn't a multiple of 100 (%d) \n", totalRate);
-		return 1;
-	}*/
 
 	dPos = number;
 	pPos = 0;
 
-	pCreates = pack(0, dPos, pPos);
+	pCreates = pack(0, dPos, pPos); // Packing the tasks
 	pPos += pCreates;
 
 	levels = 1;
 
-	while(pCreates > 1){
+	while(pCreates > 1){ // when only one primary server is created, then it is the root
 		dPos += pCreates;
 		pCreates = reduce(pPos-pCreates, pPos, pPos, dPos-pCreates);
 		pPos += pCreates;
-		levels ++;	
+		levels ++;	// counting the number of iterations to get the tree's size
 	}
 
-	primaryServer[pPos-1].father = -1;
+	primaryServer[pPos-1].father = -1; // this server is the root
+
+	/* Writing datas to a file that can be read by the online part */
 
 	fp = fopen (strcat(out,".off"), "w");
 
@@ -157,9 +154,10 @@ int pack(int first, int last, int pPos){
 		place = 0;
 		for(j = pPos ; j < pPos+serverNumber ; j++){
 			if(primaryServer[j].ratenum*dualServer[i].rateden + dualServer[i].ratenum*primaryServer[j].rateden <= dualServer[i].rateden*primaryServer[j].rateden){
+				// As the rate is a fraction, the condition and calculus of the new rate are a little bit complicated
 				primaryServer[j].ratenum = primaryServer[j].ratenum*dualServer[i].rateden + dualServer[i].ratenum*primaryServer[j].rateden;
 				primaryServer[j].rateden = primaryServer[j].rateden*dualServer[i].rateden;
-				sub = pgcd(primaryServer[j].rateden, primaryServer[j].ratenum);
+				sub = pgcd(primaryServer[j].rateden, primaryServer[j].ratenum); // simplificating rate to avoid to big integers
 				primaryServer[j].rateden = primaryServer[j].rateden/sub;
 				primaryServer[j].ratenum = primaryServer[j].ratenum/sub;
 				primaryServer[j].son[primaryServer[j].size] = i;
@@ -169,7 +167,7 @@ int pack(int first, int last, int pPos){
 				break;
 			}
 		}
-		if(!place){
+		if(!place){ // If the dual server found no place in any existing primary server, then we create a new one
 			primaryServer[pPos+serverNumber].name = pPos+serverNumber;
 			primaryServer[pPos+serverNumber].ratenum = dualServer[i].ratenum;
 			primaryServer[pPos+serverNumber].rateden = dualServer[i].rateden;
@@ -195,7 +193,7 @@ int dual(int first, int last, int dPos){
 		dualServer[dPos+i].rateden = primaryServer[first+i].rateden;
 		dualServer[dPos+i].ratenum = primaryServer[first+i].rateden-primaryServer[first+i].ratenum;
 		number = 0;
-		for(j = 0 ; j < primaryServer[first+i].size ; j++){
+		for(j = 0 ; j < primaryServer[first+i].size ; j++){ // loop to get all the periods from the subtree
 			for(k = 0 ; k < dualServer[primaryServer[first+i].son[j]].number ; k++){
 				dualServer[dPos+i].periods[number+k] = dualServer[primaryServer[first+i].son[j]].periods[k];
 			}
@@ -242,7 +240,7 @@ int printP(PS server){
 	printf("\n");
 	return 1;
 }
-
+/* find the greatest common divisor*/ 
 int pgcd(int c, int d){
 	int a;
 	int b;
