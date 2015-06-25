@@ -7,21 +7,21 @@
 #include "structures.h"
 #include <stdbool.h>
 
-#define MAX_TASKS 8
+#define MAX_TASKS 8 // Maximum tasks number defined
 
 typedef struct {
   pthread_cond_t  Cond_Var;
   pthread_mutex_t Lock;
   pthread_t       Thread_Id;
-} Shared_Task;
+} Shared_Task; // Shared structure for threads
 
 Shared_Task Shared_T;
 
 TSK Tasks[MAX_TASKS];
 
-void *TaskExec(void *i);
-void complete(int nbr);
-void insertion(int nbr);
+void *TaskExec(void *i); // Function which is executed by each task
+void complete(int nbr); // Function executed when a task has finished its execution for one period
+void insertion(int nbr); // Function executed to add a task's deadline in the linked list
 
 int TaskNbr;
 int texec = 0;
@@ -39,18 +39,22 @@ int main (int argc, char *argv[]){
     exit(1);
   }
 
-  TaskNbr = atoi(argv[1]);
+  TaskNbr = atoi(argv[1]); // Get the tasks number
 
   printf("Quels sont le WCET et la periode pour chaque tache ?\n");
 
-  Tasks[0].number = 0;
-  Tasks[0].next = 0;
+  Tasks[0].number = 0; // Initialising the fake task's number
+  Tasks[0].next = 0; // Same for its next pointer
 
   for (i = 1; i <= TaskNbr; i++){
     nbr = scanf("%f %f", &wcet, &period);
     if (nbr != 2){
       printf("L'usage est WCET-tache periode-tache\n");
+      exit(1);
     }
+
+    /* Define every component of the task structure (from structures.h)
+    *  As seen before, the task 0 is used as a "fake" one*/
 
     Tasks[i].number = i;
     Tasks[i].period = period*1000000;
@@ -61,7 +65,7 @@ int main (int argc, char *argv[]){
   }
 
   for (i = 1; i <= TaskNbr; i++){
-    totalrate += (Tasks[i].WCET/Tasks[i].period)*100;
+    totalrate += (Tasks[i].WCET/Tasks[i].period)*100; // Checking if the CPU isn't overcharged
   }
 
   if (totalrate > 100){
@@ -70,12 +74,12 @@ int main (int argc, char *argv[]){
 
   pthread_t Threads[TaskNbr];
 
-  /* Initialisation des vars. partagees */
+  // Initialising shared variables
 
   pthread_cond_init(&Shared_T.Cond_Var, NULL);
   pthread_mutex_init(&Shared_T.Lock, NULL);
 
-  pthread_mutex_lock(&Shared_T.Lock);
+  pthread_mutex_lock(&Shared_T.Lock); // Locking to create each thread without being interrupted
 
   for (i = 1; i <= TaskNbr; i++){
     int *arg = malloc(sizeof(*arg));
@@ -86,13 +90,14 @@ int main (int argc, char *argv[]){
 
   sleep(1);
 
-  pthread_mutex_unlock(&Shared_T.Lock);
+  pthread_mutex_unlock(&Shared_T.Lock); // Unlocking after "making sure" that every thread is created (with sleep())
 
 	sleep(1);
 
-	pthread_mutex_lock(&Shared_T.Lock);
+	pthread_mutex_lock(&Shared_T.Lock); // Locking again, so that only one thread can access at the same time
 
-	while(true){	
+  // If no task is active at some point, simulate the fact that the CPU is idle
+	while(true){
 		while(Tasks[0].next != 0){
 			pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
 		}
@@ -101,7 +106,7 @@ int main (int argc, char *argv[]){
 		printf("Processor is idle\n");
 
 		texec += 1000000;
-		pthread_mutex_unlock(&Shared_T.Lock);
+		pthread_mutex_unlock(&Shared_T.Lock); // Unlocking again
 		usleep(1000);
 	}
 
@@ -111,46 +116,46 @@ int main (int argc, char *argv[]){
 
 void *TaskExec(void *i){
 
-  int nbr = *((int *) i);
+  int nbr = *((int *) i); // Getting the task's number
 
-  Tasks[nbr].active = 1;
+  Tasks[nbr].active = 1; // Task is active
 
-  float w = Tasks[nbr].WCET;
+  float w = Tasks[nbr].WCET; // Execution time
 	printf("w%d = %f\n", nbr, w);
-  float q = 1000000;
+  float q = 1000000; // Quantum
 
   insertion(nbr);
 
 	while(true){
 
-		while(w >= q && Tasks[nbr].active){
+		while(w >= q && Tasks[nbr].active){ // If execution time is superior to the quantum and the task is active
 
 			pthread_mutex_lock(&Shared_T.Lock);
 
-			while(Tasks[0].next != nbr){
+			while(Tasks[0].next != nbr){ // Checking to see if the task is prioritary
 				printf("Tâche %d en attente de passer prioritaire\n", nbr);
-				pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock);
+				pthread_cond_wait(&Shared_T.Cond_Var,&Shared_T.Lock); // Waiting if not prioritary
 			}
 
-		  usleep(q);
+		  usleep(q); // Time spent sleeping, equivalent to CPU consumption by a thread/task
 			printf("Tache %d a consomme un quantum\n", nbr);
-		  w -= q;
+		  w -= q; // Reducing the execution time by the sleeping time
 
-		  texec += q;
-			pthread_mutex_unlock(&Shared_T.Lock);
-			usleep(1000);
+		  texec += q; // Adding the time spent sleeping
+			pthread_mutex_unlock(&Shared_T.Lock); // Unlocking again
+			usleep(1000); // Synchronisation time (1ms)
 		}
 
-	  complete(nbr);
+	  complete(nbr); // Completion of the task
 
 		printf("Sleep %f\n",(Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
 
-		usleep((Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
+		usleep((Tasks[nbr].complete)*(Tasks[nbr].period)-texec); // Thread is put to sleep until its next period start
 
 	  pthread_mutex_lock(&Shared_T.Lock);
-    insertion(nbr);
-    Tasks[nbr].active = 1;
-		w = Tasks[nbr].WCET;
+    insertion(nbr); // Reinsert the thread in the linked list, position corresponding to its deadline
+    Tasks[nbr].active = 1; // Activating it again
+		w = Tasks[nbr].WCET; // Reinitialising the execution time
 		printf("Tache %d va se reactiver\n", nbr);
 
     printf("texec = %d\n", texec);
@@ -158,18 +163,19 @@ void *TaskExec(void *i){
 
   }
 
-  //free(i);
-
 return 0;
 
 }
 
 void complete(int nbr){
 
-  pthread_cond_broadcast(&Shared_T.Cond_Var);
+  pthread_cond_broadcast(&Shared_T.Cond_Var); // Liberate the Conditional Variable for each thread
+
+  /* Change the linked list order, as well as pushing the deadline by the period,
+  *  changing the complete number (corresponding to the number of times a task has been completed),
+  *  and deactivating the task */
 
   Tasks[nbr].deadline += Tasks[nbr].period;
-
   Tasks[nbr].complete++;
   Tasks[nbr].active = 0;
 	Tasks[Tasks[nbr].previous].next = Tasks[nbr].next;
@@ -186,12 +192,8 @@ void insertion(int nbr){
   int i=0;
 	int inserted = 0;
 
-  /*if (*lTasks == NULL || *Tasks[nbr]  == NULL){
-    exit(EXIT_FAILURE);
-  }*/
-
-	while(Tasks[i].next != 0){
-		if(Tasks[Tasks[i].next].deadline > Tasks[nbr].deadline){
+	while(Tasks[i].next != 0){ // As long as the next task isn't the fake one
+		if(Tasks[Tasks[i].next].deadline > Tasks[nbr].deadline){ // Check on the deadline, if inferior to checked task, insert before
 			Tasks[nbr].next = Tasks[i].next;
 			Tasks[i].next = nbr;
 			Tasks[nbr].previous = i;
@@ -204,7 +206,7 @@ void insertion(int nbr){
 			i = Tasks[i].next;
 	}
 
-	if (!inserted){
+	if (!inserted){ // If the deadline is superior to every task's one, insert at the end of the linked list
 
 		Tasks[nbr].previous = i;
 		Tasks[nbr].next = 0;
