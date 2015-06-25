@@ -31,10 +31,10 @@ struct DS			// dual server
 };
 
 struct TSK {
-	float WCET;
+	int WCET;
 	int number;
-	float period;
-	float deadline;
+	int period;
+	int deadline;
 	int complete;
 	_Bool active;
 	int next;

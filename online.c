@@ -8,9 +8,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define MAX_INT 2147483647
-
 void *VCoreExec(void *arg);
+void *DualExec(void *arg);
 void *TaskExec(void *arg);
 void complete(int nbr);
 void insertion(int nbr);
@@ -19,20 +18,19 @@ int minDeadline(int name);
 int TaskNbr;
 int nbproc;
 int levels;
-int virtualCoreNbr;
-int virtualCores[20];
+int fatherCoreNbr;
 DS dualServer[30];
 PS primaryServer[30];
 
-pthread_cond_t  proc_Var[20];
+pthread_cond_t  primary_Var[20];
 
-pthread_mutex_t  proc_Lock[20];
+pthread_mutex_t  primary_Lock[20];
 
 pthread_mutex_t  mainLock;
 
 TSK Tasks[60];
 
-int q = 1000000; // Length of a quantum in microseconds
+int q = 100000; // Length of a quantum in microseconds
 
 typedef struct {
   pthread_cond_t  Cond_Var;
@@ -42,25 +40,19 @@ typedef struct {
 
 Shared_Task Shared_T;
 
-pthread_t vcThreads[20];
-pthread_t taskThreads[30];
+pthread_t primaryThreads[30];
+pthread_t dualThreads[30];
 
 int main(int argc, char* argv[]){
 
 	int i;
 	int j;
-	int k;
-	int num;
-	int min;
 	int nbD;
 	int nbP;
 	int Dlevels[20];
 	int Plevels[20];
-	int cores[20];
 
 	/* Getting all datas from .off file */
-
-	printf("max int = %d\n", MAX_INT);
 
 	if (argc != 2) {
 		printf("You must give the input file %s\n", argv[0]);
@@ -99,7 +91,7 @@ int main(int argc, char* argv[]){
 
 	fscanf(fp, "\nnumber of primary servers = %d\n", &nbP);
 
-	virtualCoreNbr = 0;
+	fatherCoreNbr = 0;
 
 	for(i = 0 ; i<nbP ; i++){
 		fscanf(fp, "\nbegin P\nnumber = %d\nrate = %d/%d\nfather = %d\nnumber of sons = %d\nsons = ", &primaryServer[i].name, &primaryServer[i].ratenum, &primaryServer[i].rateden, &primaryServer[i].father, &primaryServer[i].size);
@@ -107,15 +99,15 @@ int main(int argc, char* argv[]){
 			fscanf(fp, "%d ", &primaryServer[i].son[j]);
 		fscanf(fp, "\nend P\n");
 		primaryServer[i].active = false;
-		primaryServer[i].texec = -q;
+		primaryServer[i].texec = -1;
 		if(primaryServer[i].son[0] < TaskNbr)
-			virtualCoreNbr ++;		
+			fatherCoreNbr ++;		
 	}
 
 	Dlevels[1] = TaskNbr-1;
-	Plevels[1] = virtualCoreNbr-1;
+	Plevels[1] = fatherCoreNbr-1;
 
-	printf("Il y a %d taches sur %d processeurs et %d coeurs virtuels\n", TaskNbr, nbproc, virtualCoreNbr);
+	printf("Il y a %d taches sur %d processeurs et %d coeurs virtuels\n", TaskNbr, nbproc, fatherCoreNbr);
 
 	fclose(fp);
 
@@ -132,91 +124,48 @@ int main(int argc, char* argv[]){
 		Plevels[2*i+1] = j-1;
 	}
 
-	for (i = 0 ; i<nbproc ; i++){
-		cores[i] = -1;
-		pthread_cond_init(&proc_Var[i], NULL);
- 		pthread_mutex_init(&proc_Lock[i], NULL);
+	for (i = 0 ; i<nbP ; i++){
+		pthread_cond_init(&primary_Var[i], NULL);
+ 		pthread_mutex_init(&primary_Lock[i], NULL);
 	}
 
 	pthread_mutex_init(&mainLock, NULL);
 
-	for (i = 0; i<virtualCoreNbr ; i++){
+	pthread_mutex_lock(&primary_Lock[nbP-1]);
+
+	Tasks[nbP-1+30].next = nbP-1+30;
+
+	for (i = Dlevels[2*(levels-1)]; i <= Dlevels[2*levels-1] ; i++){
 		int *arg = malloc(sizeof(*arg));
 		*arg = i;
-		virtualCores[i] = -1;
-		pthread_create(&vcThreads[i], NULL, VCoreExec, arg);
-		printf("vient d'etre cree (coeur virtuel) : (0x)%x\n", (int) vcThreads[i]);
+		pthread_create(&dualThreads[i], NULL, DualExec, arg);
+		printf("vient d'etre cree (serveur dual) : (0x)%x\n", (int) dualThreads[i]);
 	}
 
-	primaryServer[nbP-1].active = true; // root is always active
+	sleep(1);
 
-	/* Associating real cores with virtual ones */
+	pthread_mutex_unlock(&primary_Lock[nbP-1]);
 
 	while(true){
-
+		
+		pthread_mutex_lock(&primary_Lock[nbP-1]);	
+		while(Tasks[nbP-1+30].next != nbP-1+30){
+			pthread_mutex_lock(&mainLock);
+			primaryServer[nbP-1].texec ++;
+			printf("time = %d\n", primaryServer[nbP-1].texec);
+			pthread_mutex_unlock(&mainLock);
+			pthread_cond_wait(&primary_Var[nbP-1],&primary_Lock[nbP-1]);
+			pthread_mutex_unlock(&primary_Lock[nbP-1]);	
+			usleep(1000);
+		}
 		pthread_mutex_lock(&mainLock);
-		for (i = 0; i<virtualCoreNbr ; i++){
-			primaryServer[i].texec += q;
-		}
-		printf("texec = %d\n", primaryServer[0].texec/q);
-
-		for(i = 0 ; i<nbD ; i++)
-			dualServer[i].active = false;
-
-		for(i = 0 ; i<nbP-1 ; i++)
-			dualServer[i].active = false;
-
-		for(i = levels-1 ; i>0 ; i--){
-			for (j = Plevels[2*i] ; j < Plevels[2*i+1]+1 ; j++){
-				if(primaryServer[j].active){
-					num = -1;
-					min = MAX_INT;
-					for (k = 0 ; k < primaryServer[j].size ; k++){
-						if(minDeadline(primaryServer[j].son[k]) < min && dualServer[primaryServer[j].son[k]].ratenum != 0){
-							num = primaryServer[j].son[k];
-							min = minDeadline(primaryServer[j].son[k]);
-						}
-					}
-					printf("min = %d (%d)\n", min, num);
-					for(k = 0 ; k < dualServer[num].number ; k++)
-						printf("%d ",dualServer[num].deadlines[k]);
-					printf("deadlines du min\n");
-					if(num != -1)
-						dualServer[num].active = true;
-				}
-			}
-			for (j = Plevels[2*(i-1)] ; j < Plevels[2*i-1]+1 ; j++){
-				if (!dualServer[primaryServer[j].father].active)
-					primaryServer[j].active = true;
-			}
-		}
-
-		for(i = 0 ; i<virtualCoreNbr ; i++){
-			if(primaryServer[i].active){
-				if(virtualCores[i] == -1){
-					for (j = 0 ; j<nbproc ; j++){
-						if(!(primaryServer[cores[j]].active)){
-							virtualCores[cores[j]] = -1;
-							cores[j] = i;
-							virtualCores[i] = j;
-							break;
-						}
-					}
-				}
-			}
-		}
-
-		for(i = 0 ; i<virtualCoreNbr ; i++){
-			if(primaryServer[i].active){
-				pthread_cond_broadcast(&proc_Var[i]);
-				printf("%d activé sur coeur %d\n", i, virtualCores[i]);
-				//usleep(2*q);				
-			}
-		}
-
+		primaryServer[nbP-1].texec ++;
+		printf("time = %d\n", primaryServer[nbP-1].texec);
 		pthread_mutex_unlock(&mainLock);
-				
-		usleep(2*nbproc*q);
+		usleep(q);
+		pthread_cond_broadcast(&primary_Var[nbP-1]);
+		pthread_mutex_unlock(&primary_Lock[nbP-1]);
+		usleep(nbproc*1000);
 	}
 
 	return 0;
@@ -230,7 +179,6 @@ int minDeadline(int name){
 		if(server.deadlines[i] < min)
 			min = server.deadlines[i];
 	}
-	printf("deadlines\n");
 	return min;
 }
 
@@ -238,35 +186,31 @@ void *TaskExec(void *arg){
 
 	int nbr = *((int *) arg);
 
-	int virtual = dualServer[nbr].father;
+	int father = dualServer[nbr].father;
 	int time;
-	DS server;
-	int i;
 
 	int w = dualServer[nbr].ratenum*q;
 
-	Tasks[nbr].next = virtual;
-	Tasks[nbr].previous = virtual;
+	Tasks[nbr].next = father;
+	Tasks[nbr].previous = father;
 	Tasks[nbr].active = true;
-
-	insertion(nbr);
 
 	while(true){
 
-		while(w >= q && Tasks[nbr].active){
+		while(w >= 1 && Tasks[nbr].active){
 
-			pthread_mutex_lock(&proc_Lock[virtual]);
+			pthread_mutex_lock(&primary_Lock[father]);
 
-			while(Tasks[virtual+30].next != nbr){
+			while(Tasks[father+30].next != nbr){
 				//printf("Tâche %d en attente de passer prioritaire\n", nbr);
-				pthread_cond_wait(&proc_Var[virtual],&proc_Lock[virtual]);
+				pthread_cond_wait(&primary_Var[father],&primary_Lock[father]);
 			}
 
 			usleep(q*nbproc);
-			printf("Tache %d a consomme un quantum dans le coeur %d\n", nbr, virtualCores[virtual]);
+			printf("Tache %d a consomme un quantum dans le coeur\n", nbr);
 			w -= q;
-			pthread_cond_wait(&proc_Var[virtual],&proc_Lock[virtual]);
-			pthread_mutex_unlock(&proc_Lock[virtual]);
+			pthread_cond_wait(&primary_Var[father],&primary_Lock[father]);
+			pthread_mutex_unlock(&primary_Lock[father]);
 			usleep(1000);
 		}
 
@@ -274,35 +218,23 @@ void *TaskExec(void *arg){
 
 		pthread_mutex_lock(&mainLock);
 
-		time = primaryServer[virtual].texec;
+		time = primaryServer[father].texec;
 
 		pthread_mutex_unlock(&mainLock);
 
 		while((Tasks[nbr].complete)*(dualServer[nbr].periods[0])-time/q > 0){
 			usleep(q);
-			time = primaryServer[virtual].texec;
+			time = primaryServer[father].texec;
 		}
 
-		pthread_mutex_lock(&proc_Lock[virtual]);
+		pthread_mutex_lock(&primary_Lock[father]);
 		printf("Tache %d va se reactiver\n", nbr);
 		insertion(nbr);
 		Tasks[nbr].active = 1;
-		server = dualServer[nbr];
 
-		pthread_mutex_lock(&mainLock);
-		while (primaryServer[server.father].father != -1){
-			server = dualServer[primaryServer[server.father].father];
-			for (i=0 ; i < server.number ; i++){
-				if(server.deadlines[i] == MAX_INT){
-					server.deadlines[i] = dualServer[nbr].deadlines[0];
-					break;
-				}
-			}
-		}
-		pthread_mutex_unlock(&mainLock);
 		w = dualServer[nbr].ratenum*q;
 
-		pthread_mutex_unlock(&proc_Lock[virtual]);
+		pthread_mutex_unlock(&primary_Lock[father]);
 		usleep(1000);
 
 	}
@@ -314,33 +246,38 @@ void *TaskExec(void *arg){
 void complete(int nbr){
 
 	int i;
-	int virtual = dualServer[nbr].father;
-	DS server = dualServer[nbr];
-
-	pthread_cond_broadcast(&proc_Var[virtual]);
-
-	pthread_mutex_lock(&mainLock);
-
-	while (primaryServer[server.father].father != -1){
-		server = dualServer[primaryServer[server.father].father];
-		for (i=0 ; i < server.number ; i++){
-			if(server.deadlines[i] == dualServer[nbr].deadlines[0]){
-				server.deadlines[i] = MAX_INT;
-				break;
-			}
-		}
-	}
-
-	pthread_mutex_unlock(&mainLock);
-
-	dualServer[nbr].deadlines[0] += dualServer[nbr].periods[0];
+	int father = dualServer[nbr].father;
+	int deadline;
+	int index;
+	int mustUp = 1;
 
 	Tasks[nbr].complete++;
 	Tasks[nbr].active = 0;
 	Tasks[Tasks[nbr].previous].next = Tasks[nbr].next;
 	Tasks[Tasks[nbr].next].previous = Tasks[nbr].previous;
-	Tasks[nbr].next = virtual;
-	Tasks[nbr].previous = virtual;
+	Tasks[nbr].next = father;
+	Tasks[nbr].previous = father;
+	
+	deadline = minDeadline(nbr);
+	for(i = 0 ; i < dualServer[i].number ; i++){
+		if(dualServer[nbr].deadlines[i] == deadline)
+			break;
+	}
+
+	index = i;
+
+	while(mustUp){
+		mustUp = 0;
+		deadline += dualServer[nbr].periods[index];
+		for(i = 0 ; i < dualServer[i].number ; i++){
+			if(dualServer[nbr].deadlines[i] == deadline){
+				mustUp = 1;
+				break;
+			}
+		}
+	}
+
+	dualServer[nbr].deadlines[index] = deadline;
 
 	printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete);
 
@@ -350,17 +287,17 @@ void insertion(int nbr){
 
 	int inserted = 0;
 
-	int virtual = dualServer[nbr].father+30;
-	int i=virtual;
+	int father = dualServer[nbr].father+30;
+	int i = father;
 
-	while(Tasks[i].next != virtual){
+	while(Tasks[i].next != father){
 		if(Tasks[Tasks[i].next].deadline > Tasks[nbr].deadline){
 			Tasks[nbr].next = Tasks[i].next;
 			Tasks[i].next = nbr;
 			Tasks[nbr].previous = i;
 			Tasks[Tasks[nbr].next].previous = nbr;
 			inserted = 1;
-			//printf("Tâche %d ajoutée après %d\n", nbr, Tasks[nbr].previous);
+			printf("Tâche %d ajoutée après %d\n", nbr, Tasks[nbr].previous);
 			break;
 		}
 		else
@@ -370,10 +307,10 @@ void insertion(int nbr){
 	if (!inserted){
 
 		Tasks[nbr].previous = i;
-		Tasks[nbr].next = virtual;
+		Tasks[nbr].next = father;
     	Tasks[i].next = nbr;
 
-		//printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
+		printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
 	}
 
 }
@@ -383,42 +320,108 @@ void *VCoreExec(void *arg){
 	int i;
 	int nbr = *((int *) arg);
 
-	pthread_mutex_lock(&proc_Lock[nbr]);
+	pthread_mutex_lock(&primary_Lock[nbr]);
 	Tasks[nbr+30].next = nbr+30;
 
 	usleep(1000);
 
-	while(virtualCores[nbr] == -1){
-		pthread_cond_wait(&proc_Var[nbr],&proc_Lock[nbr]);
-	}
-
 	for (i = 0; i < primaryServer[nbr].size; i++){
-		pthread_create(&taskThreads[primaryServer[nbr].son[i]], NULL, TaskExec, &primaryServer[nbr].son[i]);
-		printf("vient d'etre cree (tache) : (0x)%x\n", (int) taskThreads[primaryServer[nbr].son[i]]);
+		pthread_create(&dualThreads[primaryServer[nbr].son[i]], NULL, TaskExec, &primaryServer[nbr].son[i]);
+		printf("vient d'etre cree (tache) : (0x)%x\n", (int) dualThreads[primaryServer[nbr].son[i]]);
 	}
 
 	usleep(1000*nbproc);
 
-	pthread_mutex_unlock(&proc_Lock[nbr]);
+	pthread_mutex_unlock(&primary_Lock[nbr]);
 
 	usleep(1000*nbproc);
 
 	while(true){
-		pthread_mutex_lock(&proc_Lock[nbr]);	
+		pthread_mutex_lock(&primary_Lock[nbr]);	
 		while(Tasks[nbr+30].next != nbr+30){
-			pthread_cond_wait(&proc_Var[nbr],&proc_Lock[nbr]);
-			pthread_mutex_unlock(&proc_Lock[nbr]);	
-			usleep(nbproc*1000);
-			pthread_mutex_lock(&proc_Lock[nbr]);
+			pthread_cond_wait(&primary_Var[nbr],&primary_Lock[nbr]);	
+			usleep(1000);
 		}
 
-		usleep(q*nbproc);
-		printf("Core %d is idle %d\n", virtualCores[nbr], nbr);
-
-		pthread_mutex_unlock(&proc_Lock[nbr]);
+		usleep(q*nbproc);		
+		pthread_mutex_unlock(&primary_Lock[nbr]);
 		usleep(nbproc*1000);
 	}
 
 	return 0;
 
+}
+
+void *DualExec(void *arg){
+
+	int nbr = *((int *) arg);
+
+	int father = dualServer[nbr].father;
+	int time;
+
+	int w = dualServer[nbr].ratenum*minDeadline(nbr)/dualServer[nbr].rateden;
+	if(w != 0){
+
+		Tasks[nbr].next = father;
+		Tasks[nbr].previous = father;
+		Tasks[nbr].active = true;
+		Tasks[nbr].deadline = minDeadline(nbr);
+
+		insertion(nbr);
+
+		usleep(1000*nbproc);
+
+		while(true){
+
+			while(w >= 1 && Tasks[nbr].active){
+
+				usleep(3000);
+				pthread_mutex_lock(&primary_Lock[father]);
+
+				while(Tasks[father+30].next != nbr){
+					//printf("Tâche %d en attente de passer prioritaire\n", nbr);
+					pthread_cond_wait(&primary_Var[father],&primary_Lock[father]);
+					usleep(2000);
+				}
+
+				usleep(q);
+				printf("Serveur %d actif\n", nbr);
+				w --;				
+				pthread_cond_broadcast(&primary_Var[father]);
+				pthread_mutex_unlock(&primary_Lock[father]);
+			}
+
+			complete(nbr);
+
+			usleep(1000);
+
+			pthread_mutex_lock(&mainLock);
+
+			time = primaryServer[father].texec;
+
+			pthread_mutex_unlock(&mainLock);
+
+			while(time < Tasks[nbr].deadline-1){
+				usleep(q);
+				time = primaryServer[father].texec;
+			}
+
+			pthread_mutex_lock(&primary_Lock[father]);
+			printf("Tache %d va se reactiver\n", nbr);
+
+			Tasks[nbr].active = 1;
+
+			w = dualServer[nbr].ratenum*(minDeadline(nbr)-Tasks[nbr].deadline)/dualServer[nbr].rateden;
+			printf("w = %d\n", w);
+
+			Tasks[nbr].deadline = minDeadline(nbr);
+			insertion(nbr);
+			pthread_mutex_unlock(&primary_Lock[father]);
+			usleep(1000);
+
+		}
 	}
+
+	return 0;
+
+}
