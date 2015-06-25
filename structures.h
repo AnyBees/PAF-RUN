@@ -14,6 +14,7 @@ struct PS			// Primary server
 	int son[10];	        // Pointers to the sons of tree
 	int father;		//useful to recover the deadlines to hight level DS of the tree
 	_Bool active;
+	int texec;
 };
 
 struct DS			// dual server

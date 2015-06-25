@@ -24,16 +24,15 @@ int virtualCores[20];
 DS dualServer[30];
 PS primaryServer[30];
 
-pthread_cond_t  core_Var[20];
 pthread_cond_t  proc_Var[20];
 
-pthread_mutex_t  core_Lock[20];
 pthread_mutex_t  proc_Lock[20];
+
+pthread_mutex_t  timeLock;
 
 TSK Tasks[60];
 
 int q = 1000000; // Length of a quantum in microseconds
-int texec;
 
 typedef struct {
   pthread_cond_t  Cond_Var;
@@ -105,6 +104,7 @@ int main(int argc, char* argv[]){
 			fscanf(fp, "%d ", &primaryServer[i].son[j]);
 		fscanf(fp, "\nend P\n");
 		primaryServer[i].active = false;
+		primaryServer[i].texec = -q;
 		if(primaryServer[i].son[0] < TaskNbr)
 			virtualCoreNbr ++;		
 	}
@@ -135,6 +135,8 @@ int main(int argc, char* argv[]){
  		pthread_mutex_init(&proc_Lock[i], NULL);
 	}
 
+	pthread_mutex_init(&timeLock, NULL);
+
 	for (i = 0; i<virtualCoreNbr ; i++){
 		int *arg = malloc(sizeof(*arg));
 		*arg = i;
@@ -145,14 +147,15 @@ int main(int argc, char* argv[]){
 
 	primaryServer[nbP-1].active = true; // root is always active
 
-	int texec = -q;
-
 	/* Associating real cores with virtual ones */
 
 	while(true){
 
-		texec += q;
-		printf("loop\n");
+		pthread_mutex_lock(&timeLock);
+		for (i = 0; i<virtualCoreNbr ; i++){
+			primaryServer[i].texec += q;
+		}
+		pthread_mutex_unlock(&timeLock);
 
 		for(i = 0 ; i<nbD ; i++)
 			dualServer[i].active = false;
@@ -226,7 +229,8 @@ void *TaskExec(void *arg){
 	int nbr = *((int *) arg);
 
 	int virtual = dualServer[nbr].father;
-	DS server = dualServer[nbr];
+	int time;
+	DS server;
 	int i;
 	int j;
 
@@ -245,45 +249,52 @@ void *TaskExec(void *arg){
 			pthread_mutex_lock(&proc_Lock[virtual]);
 
 			while(Tasks[virtual+30].next != nbr){
-				printf("Tâche %d en attente de passer prioritaire\n", nbr);
+				//printf("Tâche %d en attente de passer prioritaire\n", nbr);
 				pthread_cond_wait(&proc_Var[virtual],&proc_Lock[virtual]);
 			}
 
-		usleep(q*nbproc);
-		printf("Tache %d a consomme un quantum dans le coeur %d, %d\n", nbr, virtualCores[virtual], virtual);
-		w -= q;
-		pthread_cond_wait(&proc_Var[virtual],&proc_Lock[virtual]);
-		pthread_mutex_unlock(&proc_Lock[virtual]);
-		usleep(1000);
-	}
+			usleep(q*nbproc);
+			printf("Tache %d a consomme un quantum dans le coeur %d\n", nbr, virtualCores[virtual]);
+			w -= q;
+			pthread_cond_wait(&proc_Var[virtual],&proc_Lock[virtual]);
+			pthread_mutex_unlock(&proc_Lock[virtual]);
+			usleep(1000);
+		}
 
-	complete(nbr);
+		complete(nbr);
 
-	printf("Sleep %f\n",(Tasks[nbr].complete)*(Tasks[nbr].period)-texec);
+		pthread_mutex_lock(&timeLock);
 
-	usleep((Tasks[nbr].complete)*(dualServer[nbr].periods[0])-texec);
+		time = primaryServer[virtual].texec;
 
-	pthread_mutex_lock(&proc_Lock[virtual]);
-    insertion(nbr);
-    Tasks[nbr].active = 1;
-	for (i=1 ; i<levels ; i++){
-		server = dualServer[primaryServer[server.father].father];
-		for (j=0 ; j < server.number ; j++){
-			if(server.deadlines[j] == MAX_INT){
-				server.deadlines[j] = dualServer[nbr].deadlines[0];
-				break;
+		pthread_mutex_unlock(&timeLock);
+
+		while((Tasks[nbr].complete)*(dualServer[nbr].periods[0])-time/q > 0){
+			usleep(q);
+			time = primaryServer[virtual].texec;
+		}
+
+		pthread_mutex_lock(&proc_Lock[virtual]);
+		printf("Tache %d va se reactiver\n", nbr);
+		insertion(nbr);
+		Tasks[nbr].active = 1;
+		server = dualServer[nbr];
+		for (i=1 ; i<levels ; i++){
+			server = dualServer[primaryServer[server.father].father];
+			for (j=0 ; j < server.number ; j++){
+				if(server.deadlines[j] == MAX_INT){
+					server.deadlines[j] = dualServer[nbr].deadlines[0];
+					break;
+				}
 			}
 		}
+		w = dualServer[nbr].ratenum*q;
+
+		pthread_mutex_unlock(&proc_Lock[virtual]);
+
 	}
-	w = dualServer[nbr].ratenum*q;
-	printf("Tache %d va se reactiver\n", nbr);
 
-    printf("texec = %d\n", texec);
-	pthread_mutex_unlock(&proc_Lock[virtual]);
-
-}
-
-return 0;
+	return 0;
 
 }
 
@@ -333,7 +344,7 @@ void insertion(int nbr){
 			Tasks[nbr].previous = i;
 			Tasks[Tasks[nbr].next].previous = nbr;
 			inserted = 1;
-			printf("Tâche %d ajoutée après %d\n", nbr, Tasks[nbr].previous);
+			//printf("Tâche %d ajoutée après %d\n", nbr, Tasks[nbr].previous);
 			break;
 		}
 		else
@@ -346,7 +357,7 @@ void insertion(int nbr){
 		Tasks[nbr].next = virtual;
     	Tasks[i].next = nbr;
 
-		printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
+		//printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
 	}
 
 }
