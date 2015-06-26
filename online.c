@@ -169,9 +169,9 @@ int main(int argc, char* argv[]){
 				for(i = levels-2 ; i >= 0 ; i--){
 					usleep(10000);
 					for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
-						if(!dualServer[primaryServer[j].father].active)
-							printf("On broadcaste %d\n", j);
+						if(!dualServer[primaryServer[j].father].active){
 							pthread_cond_broadcast(&primary_Var[j]);
+						}
 					}
 				}
 			}
@@ -183,7 +183,7 @@ int main(int argc, char* argv[]){
 			primaryServer[i].texec ++;
 		printf("time = %d\n", primaryServer[nbP-1].texec);
 		pthread_mutex_unlock(&mainLock);
-		for(i = levels-2 ; i >= 0 ; i++){
+		for(i = levels-2 ; i >= 0 ; i--){
 			usleep(10000);
 			for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
 				if(!dualServer[primaryServer[j].father].active)
@@ -264,7 +264,6 @@ void insertion(int nbr){
 			Tasks[nbr].previous = i;
 			Tasks[Tasks[nbr].next].previous = nbr;
 			inserted = 1;
-			printf("Tâche %d ajoutée après %d\n", nbr, Tasks[nbr].previous);
 			break;
 		}
 		else
@@ -272,12 +271,9 @@ void insertion(int nbr){
 	}
 
 	if (!inserted){
-
 		Tasks[nbr].previous = i;
 		Tasks[nbr].next = father;
     	Tasks[i].next = nbr;
-
-		printf("Tâche %d ajoutée en dernière position, ie après %d\n", nbr, i);
 	}
 
 }
@@ -342,9 +338,11 @@ void *DualExec(void *arg){
 				usleep(5000);
 				pthread_mutex_lock(&primary_Lock[father]);
 
-				while((Tasks[father+30].next != nbr) || !primaryServer[father].active){
+				while(Tasks[father+30].next != nbr || (primaryServer[father].father != -1 && dualServer[primaryServer[father].father].active)){
 					pthread_cond_wait(&primary_Var[father],&primary_Lock[father]);
-					usleep(2000);
+					pthread_mutex_unlock(&primary_Lock[father]);
+					usleep(5000);
+					pthread_mutex_lock(&primary_Lock[father]);
 				}
 				
 				pthread_mutex_unlock(&primary_Lock[father]);
@@ -352,7 +350,6 @@ void *DualExec(void *arg){
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
 					dualServer[nbr].active = true;
-					printf("%d active\n", nbr);
 					pthread_mutex_unlock(&mainLock);
 					if (primaryServer[father].father == -1)
 						usleep(q);
@@ -367,8 +364,7 @@ void *DualExec(void *arg){
 					pthread_mutex_lock(&mainLock);
 					dualServer[nbr].active = false;
 					pthread_mutex_unlock(&mainLock);
-				} else
-					printf("Tache %d consomme un quantum\n", nbr);
+				}
 				if (primaryServer[father].texec >= 0)
 					w --;
 				if (primaryServer[father].father == -1){		
@@ -394,12 +390,10 @@ void *DualExec(void *arg){
 			}
 
 			pthread_mutex_lock(&primary_Lock[father]);
-			printf("Tache %d va se reactiver\n", nbr);
 
 			Tasks[nbr].active = 1;
 
 			w = dualServer[nbr].ratenum*(minDeadline(nbr)-Tasks[nbr].deadline)/dualServer[nbr].rateden;
-			printf("w = %d\n", w);
 
 			Tasks[nbr].deadline = minDeadline(nbr);
 			insertion(nbr);
