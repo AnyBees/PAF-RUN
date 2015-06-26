@@ -171,7 +171,7 @@ int main(int argc, char* argv[]){
 					for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
 						if(!dualServer[primaryServer[j].father].active){
 							pthread_cond_broadcast(&primary_Var[j]);
-							printf("%d broadcaste\n", j);
+							//printf("%d broadcaste\n", j);
 						}
 					}
 				}
@@ -357,7 +357,7 @@ void *DualExec(void *arg){
 
 				if (primaryServer[father].father != -1){
 					pthread_mutex_lock(&primary_Lock[father]);
-					//usleep(30000);
+					usleep(50000);
 				}
 
 				if(nbr < TaskNbr){
@@ -372,14 +372,14 @@ void *DualExec(void *arg){
 				if (primaryServer[father].texec >= 0)
 					w --;
 
-				if (primaryServer[father].father != -1)
-					pthread_cond_wait(&primary_Var[father], &primary_Lock[father]);
-				
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
 					dualServer[nbr].active = false;
 					pthread_mutex_unlock(&mainLock);
 				}
+
+				if (primaryServer[father].father != -1)
+					pthread_cond_wait(&primary_Var[father], &primary_Lock[father]);
 
 				if (primaryServer[father].father == -1){		
 					pthread_cond_broadcast(&primary_Var[father]);
