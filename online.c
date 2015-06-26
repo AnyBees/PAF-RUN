@@ -29,7 +29,7 @@ pthread_mutex_t  mainLock;
 
 TSK Tasks[60];
 
-int q = 100000; // Length of a quantum in microseconds
+int q = 200000; // Length of a quantum in microseconds
 
 typedef struct {
   pthread_cond_t  Cond_Var;
@@ -171,6 +171,7 @@ int main(int argc, char* argv[]){
 					for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
 						if(!dualServer[primaryServer[j].father].active){
 							pthread_cond_broadcast(&primary_Var[j]);
+							printf("%d broadcaste\n", j);
 						}
 					}
 				}
@@ -186,8 +187,9 @@ int main(int argc, char* argv[]){
 		for(i = levels-2 ; i >= 0 ; i--){
 			usleep(10000);
 			for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
-				if(!dualServer[primaryServer[j].father].active)
+				if(!dualServer[primaryServer[j].father].active){
 					pthread_cond_broadcast(&primary_Var[j]);
+				}
 			}
 		}
 		usleep(q);
@@ -350,12 +352,25 @@ void *DualExec(void *arg){
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
 					dualServer[nbr].active = true;
-					pthread_mutex_unlock(&mainLock);
-					if (primaryServer[father].father == -1)
-						usleep(q);
+					pthread_mutex_unlock(&mainLock);					
 				}
 
-				pthread_mutex_lock(&primary_Lock[father]);
+				if (primaryServer[father].father != -1){
+					pthread_mutex_lock(&primary_Lock[father]);
+					//usleep(30000);
+				}
+
+				if(nbr < TaskNbr){
+					printf("Task %d working\n", nbr);
+				}
+
+				if (primaryServer[father].father == -1){
+					usleep(q);
+					pthread_mutex_lock(&primary_Lock[father]);
+				}
+
+				if (primaryServer[father].texec >= 0)
+					w --;
 
 				if (primaryServer[father].father != -1)
 					pthread_cond_wait(&primary_Var[father], &primary_Lock[father]);
@@ -365,8 +380,7 @@ void *DualExec(void *arg){
 					dualServer[nbr].active = false;
 					pthread_mutex_unlock(&mainLock);
 				}
-				if (primaryServer[father].texec >= 0)
-					w --;
+
 				if (primaryServer[father].father == -1){		
 					pthread_cond_broadcast(&primary_Var[father]);
 					usleep(1000);

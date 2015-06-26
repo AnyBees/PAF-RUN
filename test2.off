@@ -1,169 +1,40 @@
-Le systeme s'ordonnance sur 3 processeurs. L'arbre est obtenu apres 3 iterations
+Le systeme s'ordonnance sur 1 processeurs. L'arbre est obtenu apres 1 iterations
 
-number of dual servers = 12
+number of dual servers = 3
 
 begin D
 number = 0
-rate = 60/80
+rate = 4/10
 number of periods = 1
-periods = 80 
+periods = 10 
 father = 0
 son = -1
 end D
 
 begin D
 number = 1
-rate = 60/80
+rate = 4/15
 number of periods = 1
-periods = 80 
-father = 1
-son = -1
-end D
-
-begin D
-number = 2
-rate = 40/160
-number of periods = 1
-periods = 160 
+periods = 15 
 father = 0
 son = -1
 end D
 
 begin D
-number = 3
-rate = 80/160
+number = 2
+rate = 12/36
 number of periods = 1
-periods = 160 
-father = 2
+periods = 36 
+father = 0
 son = -1
 end D
 
-begin D
-number = 4
-rate = 80/200
-number of periods = 1
-periods = 200 
-father = 2
-son = -1
-end D
-
-begin D
-number = 5
-rate = 120/400
-number of periods = 1
-periods = 400 
-father = 3
-son = -1
-end D
-
-begin D
-number = 6
-rate = 0/1
-number of periods = 1
-periods = 80 
-father = 4
-son = 0
-end D
-
-begin D
-number = 7
-rate = 1/4
-number of periods = 1
-periods = 80 
-father = 4
-son = 1
-end D
-
-begin D
-number = 8
-rate = 1/10
-number of periods = 2
-periods = 160 200 
-father = 4
-son = 2
-end D
-
-begin D
-number = 9
-rate = 14/20
-number of periods = 1
-periods = 400 
-father = 5
-son = 3
-end D
-
-begin D
-number = 10
-rate = 13/20
-number of periods = 2
-periods = 80 200 
-father = 6
-son = 4
-end D
-
-begin D
-number = 11
-rate = 6/20
-number of periods = 1
-periods = 400 
-father = 6
-son = 5
-end D
-
-number of primary servers = 7
+number of primary servers = 1
 
 begin P
 number = 0
 rate = 1/1
-father = 6
-number of sons = 2
-sons = 0 2 
-end P
-
-begin P
-number = 1
-rate = 3/4
-father = 7
-number of sons = 1
-sons = 1 
-end P
-
-begin P
-number = 2
-rate = 9/10
-father = 8
-number of sons = 2
-sons = 3 4 
-end P
-
-begin P
-number = 3
-rate = 6/20
-father = 9
-number of sons = 1
-sons = 5 
-end P
-
-begin P
-number = 4
-rate = 7/20
-father = 10
-number of sons = 3
-sons = 6 7 8 
-end P
-
-begin P
-number = 5
-rate = 14/20
-father = 11
-number of sons = 1
-sons = 9 
-end P
-
-begin P
-number = 6
-rate = 19/20
 father = -1
-number of sons = 2
-sons = 10 11 
+number of sons = 3
+sons = 0 1 2 
 end P
