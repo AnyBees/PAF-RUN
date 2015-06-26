@@ -8,9 +8,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-void *VCoreExec(void *arg);
+void *PrimaryExec(void *arg);
 void *DualExec(void *arg);
-void *TaskExec(void *arg);
 void complete(int nbr);
 void insertion(int nbr);
 int minDeadline(int name);
@@ -99,7 +98,7 @@ int main(int argc, char* argv[]){
 			fscanf(fp, "%d ", &primaryServer[i].son[j]);
 		fscanf(fp, "\nend P\n");
 		primaryServer[i].active = false;
-		primaryServer[i].texec = -1;
+		primaryServer[i].texec = -2;
 		if(primaryServer[i].son[0] < TaskNbr)
 			fatherCoreNbr ++;		
 	}
@@ -131,9 +130,16 @@ int main(int argc, char* argv[]){
 
 	pthread_mutex_init(&mainLock, NULL);
 
-	pthread_mutex_lock(&primary_Lock[nbP-1]);
-
 	Tasks[nbP-1+30].next = nbP-1+30;
+
+	primaryServer[nbP-1].active = true; // Root is always active
+
+	for (i = 0; i < nbP-1 ; i++){
+		int *arg = malloc(sizeof(*arg));
+		*arg = i;
+		pthread_create(&primaryThreads[i], NULL, PrimaryExec, arg);
+		printf("vient d'etre cree (serveur primaire) : (0x)%x\n", (int) primaryThreads[i]);
+	}
 
 	for (i = Dlevels[2*(levels-1)]; i <= Dlevels[2*levels-1] ; i++){
 		int *arg = malloc(sizeof(*arg));
@@ -145,7 +151,7 @@ int main(int argc, char* argv[]){
 			printf("vient d'etre cree (serveur dual) : (0x)%x\n", (int) dualThreads[i]);
 	}
 
-	sleep(1);
+	usleep(3000);
 
 	pthread_mutex_unlock(&primary_Lock[nbP-1]);
 
@@ -157,20 +163,37 @@ int main(int argc, char* argv[]){
 			for(i = 0 ; i<nbP ; i++)
 				primaryServer[i].texec ++;
 			printf("time = %d\n", primaryServer[nbP-1].texec);
+			fflush(stdout);
 			pthread_mutex_unlock(&mainLock);
+			if(primaryServer[nbP-1].texec >=0){
+				for(i = levels-2 ; i >= 0 ; i--){
+					usleep(10000);
+					for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
+						if(!dualServer[primaryServer[j].father].active)
+							printf("On broadcaste %d\n", j);
+							pthread_cond_broadcast(&primary_Var[j]);
+					}
+				}
+			}
 			pthread_cond_wait(&primary_Var[nbP-1],&primary_Lock[nbP-1]);
 			pthread_mutex_unlock(&primary_Lock[nbP-1]);	
-			usleep(1000);
 		}
 		pthread_mutex_lock(&mainLock);
 		for(i = 0 ; i<nbP ; i++)
 			primaryServer[i].texec ++;
 		printf("time = %d\n", primaryServer[nbP-1].texec);
 		pthread_mutex_unlock(&mainLock);
+		for(i = levels-2 ; i >= 0 ; i++){
+			usleep(10000);
+			for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
+				if(!dualServer[primaryServer[j].father].active)
+					pthread_cond_broadcast(&primary_Var[j]);
+			}
+		}
 		usleep(q);
 		pthread_cond_broadcast(&primary_Var[nbP-1]);
 		pthread_mutex_unlock(&primary_Lock[nbP-1]);
-		usleep(nbproc*1000);
+		usleep(1000);
 	}
 
 	return 0;
@@ -259,15 +282,12 @@ void insertion(int nbr){
 
 }
 
-void *VCoreExec(void *arg){
+void *PrimaryExec(void *arg){
 
 	int i;
 	int nbr = *((int *) arg);
 
-	pthread_mutex_lock(&primary_Lock[nbr]);
 	Tasks[nbr+30].next = nbr+30;
-
-	usleep(1000);
 
 	for (i = 0; i < primaryServer[nbr].size; i++){
 		pthread_create(&dualThreads[primaryServer[nbr].son[i]], NULL, DualExec, &primaryServer[nbr].son[i]);
@@ -277,22 +297,19 @@ void *VCoreExec(void *arg){
 			printf("vient d'etre cree (serveur dual) : (0x)%x\n", (int) dualThreads[primaryServer[nbr].son[i]]);
 	}
 
-	usleep(1000*nbproc);
+	usleep(3000);
+
+	pthread_mutex_lock(&primary_Lock[nbr]);
+
+	usleep(1000);
 
 	pthread_mutex_unlock(&primary_Lock[nbr]);
 
-	usleep(1000*nbproc);
-
 	while(true){
-		pthread_mutex_lock(&primary_Lock[nbr]);	
-		while(Tasks[nbr+30].next != nbr+30){
-			pthread_cond_wait(&primary_Var[nbr],&primary_Lock[nbr]);	
-			usleep(1000);
-		}
-
-		usleep(q*nbproc);		
+		pthread_mutex_lock(&primary_Lock[nbr]);
+		pthread_cond_wait(&primary_Var[nbr], &primary_Lock[nbr]);		
 		pthread_mutex_unlock(&primary_Lock[nbr]);
-		usleep(nbproc*1000);
+		usleep(1000);
 	}
 
 	return 0;
@@ -322,32 +339,42 @@ void *DualExec(void *arg){
 
 			while(w >= 1 && Tasks[nbr].active){
 
-				usleep(3000);
+				usleep(5000);
 				pthread_mutex_lock(&primary_Lock[father]);
 
-				while(Tasks[father+30].next != nbr){
+				while((Tasks[father+30].next != nbr) || !primaryServer[father].active){
 					pthread_cond_wait(&primary_Var[father],&primary_Lock[father]);
 					usleep(2000);
 				}
 				
+				pthread_mutex_unlock(&primary_Lock[father]);
+				
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
 					dualServer[nbr].active = true;
+					printf("%d active\n", nbr);
 					pthread_mutex_unlock(&mainLock);
+					if (primaryServer[father].father == -1)
+						usleep(q);
 				}
 
-				usleep(q);
+				pthread_mutex_lock(&primary_Lock[father]);
+
+				if (primaryServer[father].father != -1)
+					pthread_cond_wait(&primary_Var[father], &primary_Lock[father]);
 				
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
 					dualServer[nbr].active = false;
 					pthread_mutex_unlock(&mainLock);
-					printf("Serveur %d actif\n", nbr);
 				} else
 					printf("Tache %d consomme un quantum\n", nbr);
-				
-				w --;				
-				pthread_cond_broadcast(&primary_Var[father]);
+				if (primaryServer[father].texec >= 0)
+					w --;
+				if (primaryServer[father].father == -1){		
+					pthread_cond_broadcast(&primary_Var[father]);
+					usleep(1000);
+				}
 				pthread_mutex_unlock(&primary_Lock[father]);
 			}
 
