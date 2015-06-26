@@ -247,8 +247,6 @@ void complete(int nbr){
 	}
 
 	dualServer[nbr].deadlines[index] = deadline;
-	if(nbr<TaskNbr)
-		printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete);
 
 }
 
@@ -361,7 +359,7 @@ void *DualExec(void *arg){
 				}
 
 				if(nbr < TaskNbr){
-					printf("Task %d working\n", nbr);
+					//printf("Task %d working\n", nbr);
 				}
 
 				if (primaryServer[father].father == -1){
@@ -371,6 +369,9 @@ void *DualExec(void *arg){
 
 				if (primaryServer[father].texec >= 0)
 					w --;
+
+				if (w == 0 && nbr < TaskNbr)
+					printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete+1);
 
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
