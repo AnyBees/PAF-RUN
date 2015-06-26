@@ -106,9 +106,9 @@ int main(int argc, char* argv[]){
 	Dlevels[1] = TaskNbr-1;
 	Plevels[1] = fatherCoreNbr-1;
 
-	printf("Il y a %d taches sur %d processeurs et %d coeurs virtuels\n", TaskNbr, nbproc, fatherCoreNbr);
-
 	fclose(fp);
+
+	/* Array to associate a server with his height in the tree */
 
 	for(i = 1 ; i<levels ; i++){
 		Dlevels[2*i] = Dlevels[2*i-1] + 1;
@@ -122,6 +122,8 @@ int main(int argc, char* argv[]){
 			j ++;
 		Plevels[2*i+1] = j-1;
 	}
+
+	/* Initiation if locks, condvars and launching all the server threads */
 
 	for (i = 0 ; i<nbP ; i++){
 		pthread_cond_init(&primary_Var[i], NULL);
@@ -160,26 +162,25 @@ int main(int argc, char* argv[]){
 		pthread_mutex_lock(&primary_Lock[nbP-1]);	
 		while(Tasks[nbP-1+30].next != nbP-1+30){
 			pthread_mutex_lock(&mainLock);
-			for(i = 0 ; i<nbP ; i++)
+			for(i = 0 ; i<nbP ; i++)  //Increasing the time (time begins at -1 to syncronise the beginning)
 				primaryServer[i].texec ++;
 			printf("time = %d\n", primaryServer[nbP-1].texec);
 			fflush(stdout);
-			pthread_mutex_unlock(&mainLock);
-			if(primaryServer[nbP-1].texec >=0){
-				for(i = levels-2 ; i >= 0 ; i--){
-					usleep(10000);
+			pthread_mutex_unlock(&mainLock); //A step in top level EDF
+			if(primaryServer[nbP-1].texec >= 0){
+				for(i = levels-2 ; i >= 0 ; i--){ //Going down the tree level after level
+					usleep(10000);	// Waiting for servers to activate
 					for(j = Plevels[2*i] ; j <= Plevels[2*i+1] ; j++){
 						if(!dualServer[primaryServer[j].father].active){
-							pthread_cond_broadcast(&primary_Var[j]);
-							//printf("%d broadcaste\n", j);
+							pthread_cond_broadcast(&primary_Var[j]); // Enabling EDF from primary server j to advance one step if his dual father is inactive
 						}
 					}
 				}
 			}
-			pthread_cond_wait(&primary_Var[nbP-1],&primary_Lock[nbP-1]);
+			pthread_cond_wait(&primary_Var[nbP-1],&primary_Lock[nbP-1]); // Waiting for top level EDF to finish a step
 			pthread_mutex_unlock(&primary_Lock[nbP-1]);	
 		}
-		pthread_mutex_lock(&mainLock);
+		pthread_mutex_lock(&mainLock); // This part is there in case no highest level dual server is active (main must take EDF to next step)
 		for(i = 0 ; i<nbP ; i++)
 			primaryServer[i].texec ++;
 		printf("time = %d\n", primaryServer[nbP-1].texec);
@@ -227,7 +228,7 @@ void complete(int nbr){
 	Tasks[nbr].next = father;
 	Tasks[nbr].previous = father;
 	
-	deadline = minDeadline(nbr);
+	deadline = minDeadline(nbr); // Getting old deadline and its index
 	for(i = 0 ; i < dualServer[i].number ; i++){
 		if(dualServer[nbr].deadlines[i] == deadline)
 			break;
@@ -235,7 +236,7 @@ void complete(int nbr){
 
 	index = i;
 
-	while(mustUp){
+	while(mustUp){ // Increasing deadline and avoiding collision with deadline from another period
 		mustUp = 0;
 		deadline += dualServer[nbr].periods[index];
 		for(i = 0 ; i < dualServer[i].number ; i++){
@@ -257,7 +258,7 @@ void insertion(int nbr){
 	int father = dualServer[nbr].father+30;
 	int i = father;
 
-	while(Tasks[i].next != father){
+	while(Tasks[i].next != father){ // Reading sorted queue to find where task must be inserted
 		if(Tasks[Tasks[i].next].deadline > Tasks[nbr].deadline){
 			Tasks[nbr].next = Tasks[i].next;
 			Tasks[i].next = nbr;
@@ -270,7 +271,7 @@ void insertion(int nbr){
 			i = Tasks[i].next;
 	}
 
-	if (!inserted){
+	if (!inserted){ // If no place was found yet, it means that the task must be adde at the end of the queue
 		Tasks[nbr].previous = i;
 		Tasks[nbr].next = father;
     	Tasks[i].next = nbr;
@@ -283,7 +284,9 @@ void *PrimaryExec(void *arg){
 	int i;
 	int nbr = *((int *) arg);
 
-	Tasks[nbr+30].next = nbr+30;
+	Tasks[nbr+30].next = nbr+30; // Initialisation of EDF queue
+
+	/* Launching sons threads */
 
 	for (i = 0; i < primaryServer[nbr].size; i++){
 		pthread_create(&dualThreads[primaryServer[nbr].son[i]], NULL, DualExec, &primaryServer[nbr].son[i]);
@@ -300,13 +303,6 @@ void *PrimaryExec(void *arg){
 	usleep(1000);
 
 	pthread_mutex_unlock(&primary_Lock[nbr]);
-
-	while(true){
-		pthread_mutex_lock(&primary_Lock[nbr]);
-		pthread_cond_wait(&primary_Var[nbr], &primary_Lock[nbr]);		
-		pthread_mutex_unlock(&primary_Lock[nbr]);
-		usleep(1000);
-	}
 
 	return 0;
 
@@ -336,6 +332,9 @@ void *DualExec(void *arg){
 			while(w >= 1 && Tasks[nbr].active){
 
 				usleep(5000);
+
+				/* Thread scheduled by EDF */
+
 				pthread_mutex_lock(&primary_Lock[father]);
 
 				while(Tasks[father+30].next != nbr || (primaryServer[father].father != -1 && dualServer[primaryServer[father].father].active)){
@@ -349,13 +348,13 @@ void *DualExec(void *arg){
 				
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
-					dualServer[nbr].active = true;
+					dualServer[nbr].active = true; // activating
 					pthread_mutex_unlock(&mainLock);					
 				}
 
 				if (primaryServer[father].father != -1){
 					pthread_mutex_lock(&primary_Lock[father]);
-					usleep(50000);
+					usleep(50000); // To make sure that main sees it is active
 				}
 
 				if(nbr < TaskNbr){
@@ -363,24 +362,24 @@ void *DualExec(void *arg){
 				}
 
 				if (primaryServer[father].father == -1){
-					usleep(q);
+					usleep(q); // Sleeping before advancing one step in root EDF
 					pthread_mutex_lock(&primary_Lock[father]);
 				}
 
-				if (primaryServer[father].texec >= 0)
+				if (primaryServer[father].texec >= 0) // time begins at -1
 					w --;
 
 				if (w == 0 && nbr < TaskNbr)
-					printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete+1);
+					printf("Tâche %d exécutée %d fois\n", nbr, Tasks[nbr].complete+1); // Won't show in complete because complete executed on next activation of this EDF, which can happen later
 
 				if(nbr >= TaskNbr){
 					pthread_mutex_lock(&mainLock);
-					dualServer[nbr].active = false;
+					dualServer[nbr].active = false; // unactivating
 					pthread_mutex_unlock(&mainLock);
 				}
 
 				if (primaryServer[father].father != -1)
-					pthread_cond_wait(&primary_Var[father], &primary_Lock[father]);
+					pthread_cond_wait(&primary_Var[father], &primary_Lock[father]); // waiting next broadcast on this EDF
 
 				if (primaryServer[father].father == -1){		
 					pthread_cond_broadcast(&primary_Var[father]);
@@ -399,7 +398,7 @@ void *DualExec(void *arg){
 
 			pthread_mutex_unlock(&mainLock);
 
-			while(time < Tasks[nbr].deadline-1){
+			while(time < Tasks[nbr].deadline-1){ // waiting right time to reactivate if
 				usleep(q);
 				time = primaryServer[father].texec;
 			}
@@ -408,9 +407,9 @@ void *DualExec(void *arg){
 
 			Tasks[nbr].active = 1;
 
-			w = dualServer[nbr].ratenum*(minDeadline(nbr)-Tasks[nbr].deadline)/dualServer[nbr].rateden;
+			w = dualServer[nbr].ratenum*(minDeadline(nbr)-Tasks[nbr].deadline)/dualServer[nbr].rateden; // new amount of work determined by last and next deadline
 
-			Tasks[nbr].deadline = minDeadline(nbr);
+			Tasks[nbr].deadline = minDeadline(nbr); // Actualising task deadline before reinsertion in queue
 			insertion(nbr);
 			pthread_mutex_unlock(&primary_Lock[father]);
 			usleep(1000);
